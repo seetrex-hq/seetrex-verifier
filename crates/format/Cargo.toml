@@ -1,0 +1,35 @@
+[package]
+name = "seetrex-format"
+# 1.0.0 from day one: the serde shape of these types IS the public
+# verdict-package format — already stable and externally observable
+# (every packaged ruleset/working_memory serializes them). Any new
+# FactValue variant or field change is a MAJOR bump.
+version = "1.0.0"
+edition.workspace = true
+# Per-crate Apache-2.0 override — this crate is OPEN; the workspace
+# default license is NOT changed. Full text in ./LICENSE; trademark
+# note in ./NOTICE.
+license = "Apache-2.0"
+description = "Serializable types and JCS canonicalization primitive defining the Seetrex Compliance verdict-package format"
+repository = "https://github.com/seetrex-hq/seetrex-verifier"
+
+[features]
+default = []
+# `utoipa` is an optional compile-time derive so the pure format crate
+# never couples to an HTTP/OpenAPI stack by default. Downstream crates
+# that expose these types over HTTP forward their own `openapi` feature
+# here.
+openapi = ["dep:utoipa"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+chrono = { workspace = true }
+rust_decimal = { workspace = true }
+thiserror = { workspace = true }
+# serde_jcs: the shared JCS RFC 8785 canonicalization primitive. Not a
+# workspace dependency; seetrex-verifier pins the same 0.2 inline —
+# kept in lockstep.
+serde_jcs = "0.2"
+utoipa = { version = "5", features = ["chrono"], optional = true }

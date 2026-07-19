@@ -1,0 +1,34 @@
+[package]
+name = "seetrex-verifier"
+# Pure offline verification core for Seetrex Compliance verdict packages.
+# Versioned independently of `compliance`; consumed by `compliance` (the
+# server/CLI) and published open-source (format + verifier open, engine
+# closed). Bump on any change to the verification surface. 0.2.0 = first
+# public line (0.1.x was internal).
+version = "0.2.0"
+edition.workspace = true
+# Per-crate Apache-2.0 override — this crate is OPEN; the workspace
+# default stays PROPRIETARY and is NOT changed. Full text in ./LICENSE;
+# trademark note in ./NOTICE.
+license = "Apache-2.0"
+description = "Pure offline verification core for Seetrex Compliance verdict packages (hash integrity, chain, ruleset anchor)"
+repository = "https://github.com/seetrex-hq/seetrex-verifier"
+
+[dependencies]
+# The pure format layer — canonicalization primitive and the format
+# types `AuditEntry`/`Fact`/`FactValue`/`Rule`. Replaces the former
+# `seetrex-core` dependency: the verifier no longer links the inference
+# engine at all (enforced by
+# `test_intent_verifier_no_longer_depends_on_engine`).
+seetrex-format = { path = "../format", version = "=1.0.0" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# JCS RFC 8785 canonicalization. NOT in workspace deps (compliance also
+# pins it inline at 0.2); kept in lockstep with compliance/Cargo.toml.
+serde_jcs = "0.2"
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+hex = { workspace = true }
+rust_decimal = { workspace = true }

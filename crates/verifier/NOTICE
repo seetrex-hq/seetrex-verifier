@@ -1,0 +1,11 @@
+Seetrex Verifier
+Copyright 2026 Seetrex
+
+This product is licensed under the Apache License, Version 2.0 (see the
+LICENSE file in this directory).
+
+Trademark notice: Section 6 of the Apache License, Version 2.0 does not
+grant permission to use the trade names, trademarks, service marks, or
+product names of the Licensor. The presence of "Seetrex" in the crate
+name "seetrex-verifier" is not a trademark license; it identifies the
+origin of the work only.
