@@ -72,11 +72,13 @@ Two Rust crates are published, both Apache-2.0:
 | Crate | Version | Role |
 |---|---|---|
 | `seetrex-format` | `1.0.0` | the pure format layer: the package's serde types + the RFC 8785 (JCS) canonicalization primitive |
-| `seetrex-verifier` | `0.3.0` | the offline verification core (verdict-hash preimages v1/v2, chain link, ruleset anchor, evidence content hash) **plus the `seetrex-verifier` executable** with the `verify-package` and `verify-chain` subcommands |
+| `seetrex-verifier` | `0.3.1` | the offline verification core (verdict-hash preimages v1/v2, chain link, ruleset anchor, evidence content hash) **plus the `seetrex-verifier` executable** with the `verify-package` and `verify-chain` subcommands |
 
-Version `0.3.0` is the first to ship the installable executable (`0.2.0` was
-library-only). crates.io versions are immutable: once published, a version's
-bytes can never be replaced under the same version number.
+Version `0.3.1` is the current reviewed release. `0.3.0` was the first to
+ship the installable executable (`0.2.0` was library-only) and is superseded:
+its `verify-chain` trailer overstated what the chain check covers — see
+section 3. crates.io versions are immutable, so `0.3.0` remains downloadable
+forever; pin `0.3.1` or later.
 
 ### 2.1 Route A — install from crates.io (primary)
 
@@ -89,18 +91,18 @@ Literal output, captured 2026-07-20 (build lines elided):
 ```
     Updating crates.io index
  Downloading crates ...
-  Installing seetrex-verifier v0.3.0
-    Finished `release` profile [optimized] target(s) in 36.21s
+  Installing seetrex-verifier v0.3.1
+    Finished `release` profile [optimized] target(s) in 25.29s
   Installing .../bin/seetrex-verifier.exe
-   Installed package `seetrex-verifier v0.3.0` (executable `seetrex-verifier.exe`)
+   Installed package `seetrex-verifier v0.3.1` (executable `seetrex-verifier.exe`)
 ```
 
-To pin the exact version reviewed by this kit, add `--version 0.3.0`. Confirm
+To pin the exact version reviewed by this kit, add `--version 0.3.1`. Confirm
 what you installed:
 
 ```
 $ seetrex-verifier --version
-seetrex-verifier 0.3.0
+seetrex-verifier 0.3.1
 ```
 
 The executable has two subcommands — `verify-package <dir>
@@ -137,19 +139,19 @@ uid                      Seetrex Compliance Release Signing <release@seetrex.com
 gpg --import seetrex-release-key.asc
 git clone https://github.com/seetrex-hq/seetrex-verifier
 cd seetrex-verifier
-git tag -v seetrex-verifier-v0.3.0
+git tag -v seetrex-verifier-v0.3.1
 ```
 
 Expected output — literal capture, 2026-07-20:
 
 ```
-object 719d0988a1bc32d632e28404f995298561cf6aec
+object ecea6cc76f1093ec46ac9536e80e383027b9c976
 type commit
-tag seetrex-verifier-v0.3.0
-tagger Seetrex Compliance Release Signing <release@seetrex.com> 1784519530 +0000
+tag seetrex-verifier-v0.3.1
+tagger Seetrex Compliance Release Signing <release@seetrex.com> 1784576453 +0000
 
-seetrex-verifier-v0.3.0
-gpg: Signature made Mon Jul 20 05:52:10 2026
+seetrex-verifier-v0.3.1
+gpg: Signature made Mon Jul 20 21:40:53 2026
 gpg:                using EDDSA key F028DE16D3B2AA440FE26F05CECC557729596616
 gpg: Good signature from "Seetrex Compliance Release Signing <release@seetrex.com>" [unknown]
 gpg: WARNING: This key is not certified with a trusted signature!
@@ -164,19 +166,19 @@ character. The `WARNING: This key is not certified with a trusted signature`
 line is *expected*: it says only that you have not personally certified the
 key in your GPG web of trust — the out-of-band fingerprint comparison is the
 check that replaces it. The earlier release tags (`seetrex-format-v1.0.0`,
-`seetrex-verifier-v0.2.0`, both at commit `f1dd053c82a1…`) verify the same
+`seetrex-verifier-v0.2.0` and `seetrex-verifier-v0.3.0`) verify the same
 way with the same key.
 
 Then build in place — the repository pins its toolchain
 (`rust-toolchain.toml`, channel `1.91.1`) and commits its `Cargo.lock`:
 
 ```
-git checkout seetrex-verifier-v0.3.0
+git checkout seetrex-verifier-v0.3.1
 cargo test --locked          # all suites, including the CLI integration tests
 cargo build --release --locked   # produces target/release/seetrex-verifier
 ```
 
-Result on 2026-07-20 at the `seetrex-verifier-v0.3.0` tag: every suite passes
+Result on 2026-07-20 at the `seetrex-verifier-v0.3.1` tag: every suite passes
 (format, verifier library, and CLI tests), zero failures.
 
 ### 2.3 Route C — pin the signing key out of band
