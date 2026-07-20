@@ -54,6 +54,46 @@ position in the chain or its freshness (that is `verify-chain` against the \
 published chain export with an externally obtained anchor). Package-internal \
 consistency alone is never a trust root.";
 
+/// Redact every occurrence of the reserved strong-pass token `VERIFIED`
+/// (matched case-insensitively, belt-and-braces) from a line before a
+/// `verify-package` output boundary prints it — spec §9.6 "Reserved
+/// vocabulary".
+///
+/// `verify-package` is a WEAK integrity check; downstream shell tooling
+/// treats the substring `VERIFIED` in a tool's output as a STRONG pass.
+/// [`PackageVerifyError`] Display texts (and, defensively, every report
+/// line) may embed package-controlled bytes — an attacker who names a file
+/// `VERIFIED_x.txt` or plants a `"ruleset_version":"VERIFIED"` type error
+/// gets that string quoted into a serde/shape error. Routing EVERY line a
+/// `verify-package` surface prints through this sanitizer is the output
+/// boundary that keeps the reserved token out of a weak check's
+/// stdout/stderr. Both CLI surfaces (the reference `compliance-cli` and
+/// the open `seetrex-verifier` binary) use THIS function — single source
+/// of truth, pinned by black-box exploit tests on both binaries.
+///
+/// The token is pure ASCII, so a byte-level scan never splits a multibyte
+/// UTF-8 sequence (continuation bytes are all >= 0x80 and never match an
+/// ASCII byte); replacing ASCII spans with the ASCII `VERIF[REDACTED]` and
+/// copying every other byte verbatim yields valid UTF-8. Note the
+/// replacement does NOT itself contain the substring `VERIFIED`.
+pub fn sanitize_reserved_token(s: &str) -> String {
+    const TOKEN: &[u8] = b"VERIFIED";
+    const REPLACEMENT: &[u8] = b"VERIF[REDACTED]";
+    let bytes = s.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes.len() - i >= TOKEN.len() && bytes[i..i + TOKEN.len()].eq_ignore_ascii_case(TOKEN) {
+            out.extend_from_slice(REPLACEMENT);
+            i += TOKEN.len();
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).expect("sanitizer preserves UTF-8 validity (ASCII-only edits)")
+}
+
 /// Read cap for any single package file (bytes). Mirrors the CLI replay
 /// paths' `MAX_INPUT_FILE_BYTES` (10 MiB) — an adversarial file must never
 /// hang or OOM the auditor's process.
@@ -1047,6 +1087,31 @@ mod tests {
             );
         }
         assert!(!SCOPE_STATEMENT.contains("VERIFIED"));
+    }
+
+    /// The output-boundary sanitizer redacts the reserved token in every
+    /// case form, leaves other text untouched, and never breaks UTF-8
+    /// around multibyte neighbors.
+    #[test]
+    fn sanitize_reserved_token_redacts_all_case_forms() {
+        assert_eq!(
+            sanitize_reserved_token("VERIFIED"),
+            "VERIF[REDACTED]",
+            "exact token redacted"
+        );
+        assert_eq!(
+            sanitize_reserved_token("file Verified_x.txt vErIfIeD"),
+            "file VERIF[REDACTED]_x.txt VERIF[REDACTED]",
+            "case-insensitive, every occurrence"
+        );
+        let sanitized = sanitize_reserved_token("§ before VERIFIED after µ");
+        assert!(!sanitized.to_ascii_uppercase().contains("VERIFIED"));
+        assert!(sanitized.contains('§') && sanitized.contains('µ'), "UTF-8 intact");
+        assert_eq!(
+            sanitize_reserved_token("integrity check failed"),
+            "integrity check failed",
+            "non-matching text passes verbatim"
+        );
     }
 
     /// Build a minimal in-tempdir package around a v1 preimage (no engine

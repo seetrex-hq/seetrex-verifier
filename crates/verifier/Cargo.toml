@@ -4,8 +4,11 @@ name = "seetrex-verifier"
 # Versioned independently of `compliance`; consumed by `compliance` (the
 # server/CLI) and published open-source (format + verifier open, engine
 # closed). Bump on any change to the verification surface. 0.2.0 = first
-# public line (0.1.x was internal).
-version = "0.2.0"
+# public line (0.1.x was internal); 0.3.0 = adds the `seetrex-verifier`
+# CLI binary (0.2.0 was library-only, so `cargo install` had nothing to
+# install — an external auditor could not obtain an executable tool from
+# public material).
+version = "0.3.0"
 edition.workspace = true
 # Per-crate Apache-2.0 override — this crate is OPEN; the workspace
 # default stays PROPRIETARY and is NOT changed. Full text in ./LICENSE;
@@ -13,6 +16,15 @@ edition.workspace = true
 license = "Apache-2.0"
 description = "Pure offline verification core for Seetrex Compliance verdict packages (hash integrity, chain, ruleset anchor)"
 repository = "https://github.com/seetrex-hq/seetrex-verifier"
+
+# The auditor-facing CLI. Declared EXPLICITLY (not left to src/bin
+# autodiscovery) so the existence of an installable binary is a pinned,
+# reviewable fact of the manifest — `cargo install seetrex-verifier`
+# must always produce an executable
+# (`test_intent_manifest_declares_installable_bin`).
+[[bin]]
+name = "seetrex-verifier"
+path = "src/bin/seetrex-verifier.rs"
 
 [dependencies]
 # The pure format layer — canonicalization primitive and the format

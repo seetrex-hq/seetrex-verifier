@@ -47,6 +47,21 @@ cargo build --locked
 cargo test --locked
 ```
 
+## Getting the verification tool
+
+`seetrex-verifier` (0.3.0 and later) ships an installable command-line
+binary of the same name:
+
+```bash
+cargo install seetrex-verifier
+
+seetrex-verifier verify-package <dir> [--expected-verdict-hash <hex>]
+seetrex-verifier verify-chain <chain-export.json>
+```
+
+See [`crates/verifier`](crates/verifier) for the outcome vocabulary and
+exit codes (they follow the spec, section 9.6).
+
 ## License
 
 `seetrex-format` and `seetrex-verifier` are licensed under the Apache

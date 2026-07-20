@@ -17,6 +17,9 @@
 //!   `compute_verdict_hash_v1`), the pinned `derived_at` encoding and the
 //!   working-memory canonicalization helpers.
 //! - [`chain`] — the audit-chain link primitive `compute_chain_hash`.
+//! - [`chain_export`] — the public chain export (§8.1): envelope/row
+//!   types and the OFFLINE verification `parse_and_verify_package` /
+//!   `verify_public_chain`.
 //! - [`rulesets`] — the ruleset anchor: `RulesetFile` parsing, strict
 //!   unknown-key validation and `ruleset_content_hash_hex`.
 //! - [`evidence`] — the evidence content-hash `canonicalize`, routed
@@ -38,6 +41,7 @@
 
 pub mod canonical;
 pub mod chain;
+pub mod chain_export;
 pub mod evidence;
 pub mod hash;
 pub mod package;

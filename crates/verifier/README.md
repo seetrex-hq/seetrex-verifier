@@ -9,10 +9,40 @@ consumes this crate and adds the inference engine on top):
 - **verdict preimage v1/v2** — `VerdictCanonicalInput` + JCS RFC 8785 + SHA-256
   (`compute_verdict_hash`, `compute_verdict_hash_v1`, `format_derived_at`);
 - **audit chain link** — `compute_chain_hash`;
+- **public chain export** — the export envelope/row types and their offline
+  verification (`parse_and_verify_package`, `verify_public_chain`);
 - **ruleset anchor** — `RulesetFile` parsing, strict unknown-key validation and
   `ruleset_content_hash_hex`;
 - **evidence content hash** — `canonicalize`, routed through the shared
-  format-layer JCS primitive.
+  format-layer JCS primitive;
+- **package integrity** — `verify_package`, the offline package-integrity
+  check the CLI is a thin shell over.
+
+## Command-line tool
+
+Since 0.3.0 the crate ships an installable binary of the same name
+(0.2.0 was library-only):
+
+```console
+cargo install seetrex-verifier
+
+seetrex-verifier verify-package <dir> [--expected-verdict-hash <hex>]
+seetrex-verifier verify-chain <chain-export.json>
+```
+
+`verify-package` is the package-integrity check of spec section 9.6 — it
+re-computes hashes only. Its outcome vocabulary and exit codes are the
+binding ones of the spec: an anchored pass prints `INTEGRITY-OK (weak)`
+and exits 0; a pass without an external anchor prints
+`SELF-CONSISTENT (unanchored)` and exits 4 (NOT a verification — a
+coherent forgery is self-consistent by construction); any failure exits 1.
+Always pass `--expected-verdict-hash` with a value obtained OUTSIDE the
+package (e.g. from the published chain export).
+
+`verify-chain` verifies a downloaded public chain export fully offline
+(spec section 8.1): it recomputes every SHA-256 link and reports the
+chain head (`verdict_count`, `last_chain_hash`) to compare against the
+published tenant page. Exit 0 on success, 1 on any failure.
 
 This is the SAME code the `compliance-cli` runs — not a replica. An auditor
 compiles exactly what production ran. The crate depends only on
