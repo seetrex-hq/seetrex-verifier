@@ -1,0 +1,31 @@
+{
+  "ruleset_id": "sprint1-sbom-presence",
+  "framework": "Sprint1Demo",
+  "article": "1",
+  "control": "sbom_presence",
+  "version": 1,
+  "engine_semantic_version_floor": 4,
+  "doc": "Sprint 1 thin-slice ruleset — demuestra que el handler PUEDE emitir verdict reproducible sobre Evidence de category=sbom. NO es control regulatorio real; CRA Art. 14 vive en T7 cuando aterricen connectors de scanners + policy.",
+  "facts_consumed": ["sbom.present", "sbom.format"],
+  "verdicts_emitted": ["SATISFIED", "VIOLATED"],
+  "rules": [
+    {
+      "id": "sprint1.sbom_present_check",
+      "name": "sprint1.sbom_present_check",
+      "priority": 100,
+      "antecedents": [],
+      "conditions": [{"fact_id": "sbom.present", "operator": "Eq", "value": true}],
+      "consequent": "sprint1.verdict_SATISFIED",
+      "consequent_value": "SATISFIED"
+    },
+    {
+      "id": "sprint1.sbom_missing_fallback",
+      "name": "sprint1.sbom_missing_fallback",
+      "priority": 50,
+      "antecedents": [],
+      "conditions": [{"fact_id": "sbom.present", "operator": "Eq", "value": false}],
+      "consequent": "sprint1.verdict_VIOLATED",
+      "consequent_value": "VIOLATED"
+    }
+  ]
+}

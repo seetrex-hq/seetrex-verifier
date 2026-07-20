@@ -1,0 +1,14 @@
+# The example package must survive git BYTE-FOR-BYTE.
+#
+# Every file below is covered by a hash that is itself committed inside the
+# verdict: the per-file `files_sha256` map, the evidence `content_hash`, the
+# ruleset content hash inside the `verdict_hash`. These files carry CRLF line
+# endings exactly as they were emitted, and git's end-of-line normalization
+# (`core.autocrlf`, `text=auto`) would rewrite them to LF on checkout —
+# silently changing the bytes and breaking every one of those hashes for
+# anyone who clones the repository.
+#
+# `-text` disables all EOL conversion for this subtree. Do not remove it, and
+# do not "tidy" the line endings of these files: the whole point of the
+# example is that what was evaluated is what is published.
+* -text

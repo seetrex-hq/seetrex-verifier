@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "chain": [
+    {
+      "ordinal": 1,
+      "verdict_id": "cf26f538-cc98-4ac1-8591-7caba28e8f03",
+      "verdict_hash": "93bcd10fd82ae721c478130b35c2c2c9030cbe2dec02e0c495254f7cbee1af69",
+      "chain_prev_hash": null,
+      "chain_hash": "ee6879123d5b8b67267e740ca93bfba1d543892177604b9742791b84bebf5a3e",
+      "appended_at": "2026-07-20T12:51:12.940813Z",
+      "ruleset_id": "sprint1-sbom-presence",
+      "verdict_outcome": "SATISFIED"
+    }
+  ]
+}
