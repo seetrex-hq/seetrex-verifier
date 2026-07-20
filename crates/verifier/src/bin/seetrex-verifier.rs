@@ -206,11 +206,33 @@ fn cmd_verify_chain(rest: &[String]) -> ExitCode {
             println!("  verdict_count:   {}", head.verdict_count);
             println!("  last_chain_hash: {}", head.last_chain_hash);
             println!();
+            // SCOPE, stated at the same volume as the banner. The link
+            // preimage covers only `verdict_hash`, `chain_prev_hash` and
+            // `chain_hash`; the human-readable columns of the export are
+            // NOT inputs to it, so editing them leaves every link — and
+            // this head hash — intact. They are committed inside each
+            // verdict's own hash, which only the verdict package lets you
+            // recompute. Saying "tamper-evidence of the observed history"
+            // here was an overclaim: an external evaluator rewrote the head
+            // row's outcome, ruleset id and timestamp and still got this
+            // banner with the vendor's exact published head hash.
             println!(
                 "Compare these two values against the vendor's public Trust \
-                 Center page for this tenant — a match proves the published \
-                 chain is internally consistent (append-only integrity + \
-                 tamper-evidence of the observed history)."
+                 Center page for this tenant — a match proves the LINKS of \
+                 the observed history are intact: no row was inserted, \
+                 removed or reordered, and no hash column was altered, \
+                 without breaking a link."
+            );
+            println!();
+            println!(
+                "NOT covered by this check: the human-readable columns of \
+                 each row (verdict_outcome, ruleset_id, appended_at, \
+                 verdict_id). They are not inputs to the chain link, so \
+                 altering them keeps every link — and the hash above — \
+                 valid. Each is committed inside its own verdict_hash, \
+                 which you can only recompute from that verdict's package \
+                 (`verify-package`). Treat these columns as unverified \
+                 metadata until you do."
             );
             ExitCode::SUCCESS
         }

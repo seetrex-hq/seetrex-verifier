@@ -230,7 +230,9 @@ Public chain package VERIFIED OFFLINE
   verdict_count:   151
   last_chain_hash: fcc388ce4e245cc2a8e75d1dd6607724a20d969460419a62cc7ee0b2d6b5f555
 
-Compare these two values against the vendor's public Trust Center page for this tenant — a match proves the published chain is internally consistent (append-only integrity + tamper-evidence of the observed history).
+Compare these two values against the vendor's public Trust Center page for this tenant — a match proves the LINKS of the observed history are intact: no row was inserted, removed or reordered, and no hash column was altered, without breaking a link.
+
+NOT covered by this check: the human-readable columns of each row (verdict_outcome, ruleset_id, appended_at, verdict_id). They are not inputs to the chain link, so altering them keeps every link — and the hash above — valid. Each is committed inside its own verdict_hash, which you can only recompute from that verdict's package (`verify-package`). Treat these columns as unverified metadata until you do.
 ```
 
 Exit code: `0`.
@@ -249,8 +251,28 @@ language (Appendix A does exactly that and reproduces the same head).
 - `Public chain package VERIFIED OFFLINE` + exit `0`: this is the strong
   chain surface's success token (chain verification is one of the two
   surfaces the reserved token belongs to, spec section 9.6). It means the
-  export is internally consistent: no row of the observed history was
-  altered, inserted, or removed without breaking a downstream link.
+  **links** of the observed history are intact: no row was inserted,
+  removed or reordered, and no hash column was altered, without breaking a
+  downstream link.
+
+  **Read the scope of that sentence carefully, because it is narrower than
+  it first sounds.** Only three of the eight columns are inputs to the link
+  preimage: `verdict_hash`, `chain_prev_hash` and `chain_hash`. The four
+  human-readable columns — `verdict_outcome`, `ruleset_id`, `appended_at`,
+  `verdict_id` — are **not** hashed by this check. Edit them and every link
+  still recomputes, the head hash is unchanged, and the tool still prints
+  the banner above. An earlier revision of this document claimed "no row was
+  altered"; an external evaluator falsified that by rewriting the head row's
+  outcome from `SATISFIED` to `VIOLATED` and still obtaining exit `0` with
+  the vendor's exact published head hash. The claim, not the tool, was
+  wrong — and the wording here is now the corrected one.
+
+  Those four columns are not unprotected in the record itself: each is
+  committed inside its row's `verdict_hash` (preimage v2, section 7). But
+  that binding is only recomputable from the verdict's **package**, which
+  the chain export does not carry. So: treat the readable columns of an
+  export as unverified metadata, and use `verify-package` on the package
+  behind a row before you rely on the outcome it displays.
 - `verdict_count` / `last_chain_hash`: the recomputed head. To bind the
   export to what the vendor currently publishes, compare both values against
   the Trust Center page (`https://seetrex.com/trust/`) — a channel you fetch

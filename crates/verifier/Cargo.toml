@@ -8,7 +8,7 @@ name = "seetrex-verifier"
 # CLI binary (0.2.0 was library-only, so `cargo install` had nothing to
 # install — an external auditor could not obtain an executable tool from
 # public material).
-version = "0.3.0"
+version = "0.3.1"
 edition.workspace = true
 # Per-crate Apache-2.0 override — this crate is OPEN; the workspace
 # default stays PROPRIETARY and is NOT changed. Full text in ./LICENSE;
