@@ -78,7 +78,13 @@ Version `0.3.1` is the current reviewed release. `0.3.0` was the first to
 ship the installable executable (`0.2.0` was library-only) and is superseded:
 its `verify-chain` trailer overstated what the chain check covers — see
 section 3. crates.io versions are immutable, so `0.3.0` remains downloadable
-forever; pin `0.3.1` or later.
+forever; pin `0.3.1` or later. The only source file that differs between the
+two published crates is the executable's — the library sources are identical
+**once line endings are normalised**, because `0.3.0` was packaged with LF and
+`0.3.1` with CRLF. Unpack both from `static.crates.io` and check it yourself,
+but normalise first: a plain `diff -r` reports every file as changed and tells
+you nothing. The published `Cargo.lock` also advanced a few patch versions,
+which affects `cargo install --locked` and not a library consumer.
 
 ### 2.1 Route A — install from crates.io (primary)
 
@@ -404,9 +410,9 @@ source rebuild under NDA for regulators. To arrange either, contact
 | Artifact | Where it lives | How it is pinned |
 |---|---|---|
 | Release-signing GPG key | `https://seetrex.com/.well-known/release-signing-pubkey.asc` AND `keys/release-signing-pubkey.asc` in the public repository | fingerprint `F028 DE16 D3B2 AA44 0FE2 6F05 CECC 5577 2959 6616`, cross-checked over the independent channels of section 2.3 (this document / vendor domain over TLS / the repository copy as a self-consistency check); compare by fingerprint, not file bytes; ed25519, expires 2028-07-09 |
-| Source repository | `https://github.com/seetrex-hq/seetrex-verifier` | GPG-signed release tags, verified with `git tag -v` against the pinned fingerprint: `seetrex-verifier-v0.3.0` at commit `719d0988a1bc…` (current); `seetrex-format-v1.0.0` and `seetrex-verifier-v0.2.0` at commit `f1dd053c82a1…` |
+| Source repository | `https://github.com/seetrex-hq/seetrex-verifier` | GPG-signed release tags, verified with `git tag -v` against the pinned fingerprint: `seetrex-verifier-v0.3.1` at commit `ecea6cc76f10…` (current); superseded: `seetrex-verifier-v0.3.0` at commit `719d0988a1bc…`, `seetrex-format-v1.0.0` and `seetrex-verifier-v0.2.0` at commit `f1dd053c82a1…` |
 | `seetrex-format` `1.0.0` | crates.io | crates.io versions are immutable; pin with the exact requirement `=1.0.0` |
-| `seetrex-verifier` `0.3.0` | crates.io | immutable; install with `cargo install seetrex-verifier --locked --version 0.3.0` (ships the executable), or pin `=0.3.0` as a library dependency (itself pins `seetrex-format =1.0.0`) |
+| `seetrex-verifier` `0.3.1` | crates.io | immutable; install with `cargo install seetrex-verifier --locked --version 0.3.1` (ships the executable), or pin `=0.3.1` as a library dependency (itself pins `seetrex-format =1.0.0`). `0.3.0` stays downloadable forever and must not be used **as the executable**: its `verify-chain` trailer overstated the check's coverage (section 3). As a library it is equivalent — see appendix A |
 | Package format spec | `docs/SPEC_VERDICT_PACKAGE_V1.md` in the source repository | covered by the signed tag; the normative reference for every check in this kit |
 | Public chain export | `https://seetrex.com/trust/seetrex-compliance-chain.json` | self-verifying offline (section 3); head comparable against the Trust Center page (`verdict_count`, `last_chain_hash`), fetched over a channel you control |
 | Build toolchain | `rust-toolchain.toml` (channel `1.91.1`) + committed `Cargo.lock` in the source repository | build and test with `--locked` from the signed tag |
@@ -428,6 +434,19 @@ release (`=0.3.0`) and run on 2026-07-20; the chain program independently
 reproduced the exact head the installed binary printed in section 3 (151
 rows, head `fcc388ce4e24…`).
 
+The pins below say `=0.3.1` while that capture was taken with `=0.3.0`, and the
+gap is stated rather than hidden: **for these two programs the two releases are
+the same code**. The one source file that differs between the published crates
+is the executable's, which neither program here uses; the library sources match
+once line endings are normalised (`0.3.0` shipped LF, `0.3.1` CRLF). The pin is
+raised for consistency with the rest of this kit, not because it changes a
+result — and the capture above is left at the version that produced it rather
+than restated, because a dated record of a run that happened is worth more than
+a tidier number for a run that did not. Pin `=0.3.0` instead and these programs
+behave identically. Do not take that on our word: unpack both crates and diff
+`src/`, normalising line endings first, or the diff will mark all 10 files under
+`src/` as changed and you will have learned nothing.
+
 ### A.1 Chain export check (reimplements section 3)
 
 `Cargo.toml`:
@@ -439,7 +458,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-seetrex-verifier = "=0.3.0"
+seetrex-verifier = "=0.3.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ```
@@ -585,4 +604,4 @@ fn main() {
 }
 ```
 
-`Cargo.toml` dependencies: `seetrex-verifier = "=0.3.0"` only.
+`Cargo.toml` dependencies: `seetrex-verifier = "=0.3.1"` only.

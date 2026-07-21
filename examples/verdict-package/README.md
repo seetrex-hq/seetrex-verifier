@@ -34,7 +34,7 @@ Install the verifier first (see the repository README or
 [`docs/AUDITOR_KIT.md`](../../docs/AUDITOR_KIT.md)):
 
 ```
-$ cargo install seetrex-verifier --locked --version 0.3.0
+$ cargo install seetrex-verifier --locked --version 0.3.1
 ```
 
 **Without an external anchor** — internal consistency only:
@@ -57,6 +57,10 @@ Public chain package VERIFIED OFFLINE
   verdict_count:   1
   last_chain_hash: ee6879123d5b8b67267e740ca93bfba1d543892177604b9742791b84bebf5a3e
 
+Compare these two values against the vendor's public Trust Center page for this tenant — a match proves the LINKS of the observed history are intact: no row was inserted, removed or reordered, and no hash column was altered, without breaking a link.
+
+NOT covered by this check: the human-readable columns of each row (verdict_outcome, ruleset_id, appended_at, verdict_id). They are not inputs to the chain link, so altering them keeps every link — and the hash above — valid. Each is committed inside its own verdict_hash, which you can only recompute from that verdict's package (`verify-package`). Treat these columns as unverified metadata until you do.
+
 $ seetrex-verifier verify-package examples/verdict-package/package \
     --expected-verdict-hash 93bcd10fd82ae721c478130b35c2c2c9030cbe2dec02e0c495254f7cbee1af69
 ...
@@ -70,12 +74,30 @@ Trust Center. In this example the chain holds a single genesis row, so its
 `chain_hash` is the SHA-256 of the ASCII bytes of the `verdict_hash` alone; a
 real chain links every later row to its predecessor.
 
+The two paragraphs the chain check prints after its banner are **reproduced here
+in full, and must stay that way**. The `verify-chain` banner names a strong
+result, and the scope that follows is what keeps that result from being read as
+more than it is: the link preimage covers only the hash columns, so an edit to
+`verdict_outcome`, `ruleset_id` or `appended_at` leaves every link — and the
+head hash you would compare — intact. An earlier revision of this file quoted
+the banner alone. Eliding those paragraphs as boilerplate is how the overclaim
+comes back.
+
 ## Try breaking it
 
-The checks are only worth what their failures prove. Alter one byte of any
-packaged file, or pass a wrong `--expected-verdict-hash`, and the run must fail
-loudly, naming the step and the file — exit code `1`, no terminal token. If it
-ever fails quietly, that is a bug worth reporting.
+The checks are only worth what their failures prove. Alter one byte of any file
+under `package/`, or pass a wrong `--expected-verdict-hash`, and the run must
+fail loudly, naming the step and the file — exit code `1`, no terminal token. If
+it ever fails quietly, that is a bug worth reporting.
+
+The chain export beside it is the documented exception, and it is worth breaking
+on purpose to see the limit for yourself. Change `verdict_outcome` from
+`SATISFIED` to `VIOLATED` in `example-audit-tenant-chain.json` and run
+`verify-chain` again: it still prints `VERIFIED OFFLINE`, still prints the same
+`last_chain_hash`, and still exits `0`. That is not a bug — those columns are
+not inputs to the chain link, which is exactly what the scope paragraph above
+says. It is also the reason that paragraph is printed at the same volume as the
+banner: without it, this example would read as a promise the check never made.
 
 ## What this proves — and what it does not
 
