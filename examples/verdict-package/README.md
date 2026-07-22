@@ -14,9 +14,14 @@ dependency graph.
 The ruleset ships **exactly as it was evaluated**, developer prose and all —
 its `doc` field still reads like the internal note it was. That is not an
 oversight, it is the property being demonstrated: the ruleset's content hash is
-committed inside this verdict's `verdict_hash`, so tidying a single byte would
-break the anchor and the example would stop verifying. What was evaluated is
-what is published.
+committed inside this verdict's `verdict_hash`, so changing what the ruleset
+*says* — a word of that prose, a threshold, a rule — breaks the anchor and the
+example stops verifying. Re-*encoding* it does not, and that is deliberate: the
+hash is taken over the canonical (JCS) form of the parsed document, so
+re-indenting, reordering keys or writing the non-ASCII characters as `\uXXXX`
+escapes all reach the same anchor. It is what lets you recompute this hash with
+any conformant JSON library instead of ours. What was evaluated is what is
+published.
 
 ```
 examples/verdict-package/

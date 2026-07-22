@@ -439,3 +439,203 @@ pub fn ruleset_content_hash_hex(ruleset: &RulesetFile) -> Result<String, serde_j
     hasher.update(canonical.as_bytes());
     Ok(hasher.finalize().iter().map(|b| format!("{b:02x}")).collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ---------------------------------------------------------------
+    // Encoding fixtures.
+    //
+    // Every non-ASCII character below is written as a Rust \u{..}
+    // escape, and every JSON \uXXXX escape is built from U+005C
+    // (REVERSE SOLIDUS) at runtime. This module's own source is
+    // therefore pure ASCII: a fixture about character encoding must not
+    // be at the mercy of the encoding an editor saves it in, nor of a
+    // tool that "helpfully" rewrites an escape into its character.
+    // ---------------------------------------------------------------
+
+    /// Ruleset body with `__DOC__` (top-level `doc`) and `__NAME__`
+    /// (nested `rules[0].name`) placeholders, keys in the on-disk order,
+    /// indented.
+    const TEMPLATE_INDENTED: &str = r#"{
+  "ruleset_id": "sprint1-sbom-presence",
+  "framework": "Sprint1Demo",
+  "article": "1",
+  "control": "sbom_presence",
+  "version": 1,
+  "engine_semantic_version_floor": 4,
+  "doc": "__DOC__",
+  "facts_consumed": ["sbom.present"],
+  "verdicts_emitted": ["SATISFIED"],
+  "rules": [
+    {
+      "id": "sprint1.sbom_present_check",
+      "name": "__NAME__",
+      "priority": 100,
+      "antecedents": [],
+      "conditions": [{"fact_id": "sbom.present", "operator": "Eq", "value": true}],
+      "consequent": "sprint1.verdict_SATISFIED",
+      "consequent_value": "SATISFIED"
+    }
+  ]
+}"#;
+
+    /// The SAME ruleset with the keys in a different order, no
+    /// pretty-printing whatsoever, and an EXPLICIT
+    /// `"regulatory_source": null`. Absent and null must be the same
+    /// ruleset: the field is an `Option` with
+    /// `skip_serializing_if = "Option::is_none"`, so a reimplementation
+    /// that emits the key as null must still reach our anchor.
+    const TEMPLATE_REORDERED_COMPACT_NULL_SOURCE: &str = r#"{"doc":"__DOC__","regulatory_source":null,"rules":[{"id":"sprint1.sbom_present_check","name":"__NAME__","priority":100,"antecedents":[],"conditions":[{"fact_id":"sbom.present","operator":"Eq","value":true}],"consequent":"sprint1.verdict_SATISFIED","consequent_value":"SATISFIED"}],"verdicts_emitted":["SATISFIED"],"facts_consumed":["sbom.present"],"engine_semantic_version_floor":4,"version":1,"control":"sbom_presence","article":"1","framework":"Sprint1Demo","ruleset_id":"sprint1-sbom-presence"}"#;
+
+    /// The anchor every encoding of the fixture must produce.
+    ///
+    /// This constant is the BEHAVIOURAL half of the test. The equality
+    /// assertions alone cannot fail while `ruleset_content_hash_hex`
+    /// takes an already-parsed `RulesetFile`: the encoding is destroyed
+    /// before the function is entered, so those assertions lock the
+    /// ARCHITECTURE, not a computation. The pin DOES fail -- a
+    /// `serde_jcs` bump that changes canonical output, a renamed or
+    /// added `RulesetFile` field, or a different digest all move it. It
+    /// doubles as a conformance vector an independent implementation can
+    /// target.
+    ///
+    /// Regenerate ONLY deliberately: set it to "TBD", run the test, copy
+    /// the `left` value from the failure, and say in the PR why the
+    /// anchor of an unchanged ruleset moved.
+    const PINNED_ANCHOR: &str =
+        "0aa002b4f1f32f4f2b864945d10c9fecefe826a917f3393baa33d28d2d198849";
+
+    fn anchor_of(json: &str) -> String {
+        let parsed = RulesetFile::from_json(json).expect("fixture parses");
+        ruleset_content_hash_hex(&parsed).expect("fixture hashes")
+    }
+
+    fn render(template: &str, doc: &str, name: &str) -> String {
+        template
+            .replacen("__DOC__", doc, 1)
+            .replacen("__NAME__", name, 1)
+    }
+
+    /// INTENT: `ruleset_content_hash_hex` commits to the ruleset's
+    ///         SEMANTICS, never to the bytes of the document that
+    ///         carried it. Encodings of one ruleset differing in
+    ///         whitespace, key order, \uXXXX escaping of non-ASCII
+    ///         (including supplementary-plane characters, which JCS
+    ///         escapes as UTF-16 surrogate pairs) and in an absent vs
+    ///         explicitly-null optional field MUST all produce the same
+    ///         anchor; changing what the ruleset SAYS must move it. This
+    ///         is what lets an independent implementation recompute our
+    ///         anchor with any conformant JSON library instead of ours
+    ///         -- the property the published spec sells.
+    ///
+    ///         **Scope, stated precisely.** This is a claim about the
+    ///         ANCHOR ONLY (`verify-package` STEP 5). It is NOT a claim
+    ///         that a re-encoded package still verifies: a package also
+    ///         carries `manifest.files_sha256`, deliberately a hash of
+    ///         the STORED BYTES, checked at STEP 2 -- before the anchor
+    ///         is ever computed. Re-encode a packaged `ruleset.json`
+    ///         without recomputing that manifest entry and verification
+    ///         fails at STEP 2 by design. Byte-exact storage and
+    ///         semantic anchoring are two different guarantees; this
+    ///         test locks only the second.
+    ///
+    /// CONTEXT: an earlier session filed a "canonicalisation divergence"
+    ///          -- a legitimate package declared tampered once the em dash
+    ///          in `doc` was escaped. A later session reproduced it: the
+    ///          harness read the file with the Windows locale encoding
+    ///          (cp1252) instead of UTF-8, decoding the three UTF-8
+    ///          bytes of U+2014 as three separate characters. That is a
+    ///          REAL content change, correctly rejected; no divergence
+    ///          existed. The mojibake fixture below is that exact
+    ///          corruption, kept as the negative half so this test
+    ///          proves both directions at once. The corruption
+    ///          round-trips symmetrically -- re-encoding it back THROUGH
+    ///          CP1252 restores the original bytes -- which is why the
+    ///          harness's own "raw" control looked green while sharing
+    ///          the very defect it was meant to catch.
+    ///
+    /// EXPIRES IF: the anchor stops being JCS-over-the-typed-struct
+    ///             (e.g. it moves to hashing stored bytes). That is a
+    ///             preimage break requiring a spec bump, and this test
+    ///             must be rewritten in the same PR.
+    #[test]
+    fn test_intent_ruleset_anchor_invariant_under_json_re_encoding() {
+        let bs = '\u{5c}'; // U+005C REVERSE SOLIDUS
+
+        // U+2014 EM DASH (BMP) and U+1F600 GRINNING FACE (supplementary
+        // plane -- JCS escapes it as the surrogate pair d83d/de00, the
+        // case where independent JCS implementations actually diverge).
+        let raw_payload = "a \u{2014} b \u{1f600} c";
+        let escaped_payload = format!("a {bs}u2014 b {bs}ud83d{bs}ude00 c");
+        // The cp1252 corruption: the UTF-8 bytes of U+2014 (e2 80 94) read
+        // back through cp1252 as three characters. ONLY the em dash is
+        // corrupted, so the inequality below is attributable to it.
+        let mojibake_payload =
+            "a \u{00e2}\u{20ac}\u{201d} b \u{1f600} c";
+
+        let raw_indented = render(TEMPLATE_INDENTED, raw_payload, raw_payload);
+        let escaped_indented =
+            render(TEMPLATE_INDENTED, &escaped_payload, &escaped_payload);
+        let escaped_compact = render(
+            TEMPLATE_REORDERED_COMPACT_NULL_SOURCE,
+            &escaped_payload,
+            &escaped_payload,
+        );
+        let mojibake =
+            render(TEMPLATE_INDENTED, mojibake_payload, mojibake_payload);
+
+        // Harness guard. A prior session lost two reproduction scripts to
+        // exactly this failure mode: a generator that silently produced
+        // identical inputs would make every assertion below hold
+        // vacuously and report green without testing anything.
+        let sources =
+            [&raw_indented, &escaped_indented, &escaped_compact, &mojibake];
+        for (i, a) in sources.iter().enumerate() {
+            for b in sources.iter().skip(i + 1) {
+                assert_ne!(
+                    a.as_bytes(),
+                    b.as_bytes(),
+                    "fixtures must be byte-distinct or the invariant is untested"
+                );
+            }
+        }
+        // And the escapes must reach the parser AS escapes, not as
+        // characters something upstream already resolved.
+        assert!(
+            escaped_indented.contains(&format!("{bs}ud83d{bs}ude00")),
+            "the surrogate-pair escape must survive into the JSON document"
+        );
+
+        let anchor = anchor_of(&raw_indented);
+        assert_eq!(
+            anchor, PINNED_ANCHOR,
+            "the anchor of this fixture moved. Nothing about the ruleset \
+             changed, so something under it did: a serde_jcs bump, a \
+             RulesetFile field added or renamed, a different digest. Every \
+             anchor already published moved with it -- treat this as a \
+             preimage break, not as a stale constant."
+        );
+        assert_eq!(
+            anchor,
+            anchor_of(&escaped_indented),
+            "escaping non-ASCII must NOT move the anchor -- a \
+             reimplementation whose JSON library escapes by default (e.g. \
+             Python's `ensure_ascii=True`) has to reach our hash"
+        );
+        assert_eq!(
+            anchor,
+            anchor_of(&escaped_compact),
+            "key order, whitespace and an explicitly-null optional field \
+             must NOT move the anchor -- the hash is over the JCS form of \
+             the parsed struct"
+        );
+        assert_ne!(
+            anchor,
+            anchor_of(&mojibake),
+            "a REAL change to the text MUST move the anchor -- this is the \
+             cp1252 corruption, and rejecting it is correct behaviour"
+        );
+    }
+}

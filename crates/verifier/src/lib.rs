@@ -29,6 +29,10 @@
 //! - [`package`] — `verify_package`: offline package-integrity
 //!   verification — the logic the `verify-package` CLI subcommand is a
 //!   thin shell over.
+//! - [`scope`] — the auditor-facing scope statements (`SCOPE_NOT_COVERED`,
+//!   `SCOPE_LINK_CLAIM`) shared verbatim by the public verifier binary and the
+//!   `compliance-cli`, so the two surfaces cannot disagree about what the
+//!   OFFLINE chain check covers.
 //! - [`types`] — `VerdictOutcome`, the closed set of the three verdicts.
 //!
 //! The crate depends on `seetrex-format` (the pure format layer: the
@@ -46,6 +50,7 @@ pub mod evidence;
 pub mod hash;
 pub mod package;
 pub mod rulesets;
+pub mod scope;
 pub mod types;
 
 #[cfg(test)]

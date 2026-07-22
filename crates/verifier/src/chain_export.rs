@@ -30,12 +30,21 @@ pub const PUBLIC_CHAIN_SCHEMA_VERSION: &str = "1.0";
 /// allowlist (§8.1). Hashes are commitments over the evidence; the
 /// evidence itself NEVER appears here.
 ///
-/// Two data classes, both declared on the public verify page:
+/// Three data classes. The public verify page declares the split
+/// between the reproducible and the self-attested ones:
 /// - `verdict_hash`/`chain_prev_hash`/`chain_hash`: reproducible
 ///   offline by the auditor (this module's [`verify_public_chain`]).
-/// - `ordinal`/`verdict_id`/`appended_at`/`ruleset_id`/
-///   `verdict_outcome`: self-attested metadata, committed INSIDE
-///   `verdict_hash` but not independently recomputable in v1.
+/// - `ruleset_id`/`verdict_outcome`: self-attested here, but
+///   committed inside `verdict_hash` — recomputable from the
+///   verdict's PACKAGE, which this export does not carry.
+/// - `verdict_id`/`appended_at`: committed NOWHERE. Inputs neither
+///   to the chain link nor to `VerdictCanonicalInput` (v1 or v2),
+///   so no artifact we publish binds them.
+/// `ordinal` is hashed nowhere either, but is not free: this module
+/// requires it contiguous 1..=N. That contiguity is internal to the
+/// file you hold; it does not pin N against a shorter file, so
+/// truncation from the end verifies — `verify_public_chain` returns
+/// `verdict_count` = the rows PRESENT, not a claimed total.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PublicChainRow {

@@ -616,7 +616,8 @@ The chain is published per tenant as a JSON document with a closed key set
 { "schema_version": "1.0", "chain": [ <row>, <row>, … ] }
 ```
 
-Each row carries exactly eight fields, in two data classes:
+Each row carries exactly eight fields, in three data classes —
+independently checkable, reproducible offline, and self-attested:
 
 | Field | Type | Class |
 |---|---|---|

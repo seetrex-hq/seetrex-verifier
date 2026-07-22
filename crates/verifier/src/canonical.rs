@@ -9,8 +9,11 @@
 //! `compliance_verdict.working_memory_canonical JSONB` + related
 //! columns) can recompute this hash with `compute_verdict_hash` and
 //! verify it matches the `verdict_hash` persisted in the row —
-//! cryptographic proof that the engine produced that verdict over those
-//! exact inputs, with no later alteration.
+//! cryptographic proof that hash and inputs are mutually consistent,
+//! i.e. that neither was altered without the other. It is NOT proof of
+//! authorship: the hash is a pure function of its inputs, so anyone
+//! holding them computes the same value. Coherence, not attribution
+//! (SPEC §9.3).
 //!
 //! Any deterministic engine + JCS + SHA-256 produces the same hash over
 //! the same input — verifiable cross-implementation, cross-time,
