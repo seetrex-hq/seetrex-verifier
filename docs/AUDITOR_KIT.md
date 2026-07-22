@@ -125,11 +125,8 @@ Source of truth: `https://github.com/seetrex-hq/seetrex-verifier`. Release
 tags are GPG-signed with the Seetrex Compliance release-signing key. Verify
 the tag before trusting the tree.
 
-The current crates.io release is `0.3.2`; its signed source tag
-`seetrex-verifier-v0.3.2` is created at publication. The worked example below
-verifies `seetrex-verifier-v0.3.1` — the most recent already-signed tag and a
-dated capture of the scheme — because every tag signs with the same key and
-verifies identically; once `v0.3.2`'s tag is present, substitute it below.
+The current release is `0.3.2`; the walkthrough below verifies its signed tag
+`seetrex-verifier-v0.3.2`.
 
 ```
 # 1. Fetch the release-signing public key (see 2.3 for out-of-band pinning)
@@ -154,19 +151,19 @@ uid                      Seetrex Compliance Release Signing <release@seetrex.com
 gpg --import seetrex-release-key.asc
 git clone https://github.com/seetrex-hq/seetrex-verifier
 cd seetrex-verifier
-git tag -v seetrex-verifier-v0.3.1
+git tag -v seetrex-verifier-v0.3.2
 ```
 
-Expected output — literal capture, 2026-07-20:
+Expected output — literal capture, 2026-07-22:
 
 ```
-object ecea6cc76f1093ec46ac9536e80e383027b9c976
+object 54676db4e66b17e15bc59525e28954e966099853
 type commit
-tag seetrex-verifier-v0.3.1
-tagger Seetrex Compliance Release Signing <release@seetrex.com> 1784576453 +0000
+tag seetrex-verifier-v0.3.2
+tagger Seetrex Compliance Release Signing <release@seetrex.com> 1784714162 +0000
 
-seetrex-verifier-v0.3.1
-gpg: Signature made Mon Jul 20 21:40:53 2026
+seetrex-verifier-v0.3.2
+gpg: Signature made Wed Jul 22 11:56:02 2026
 gpg:                using EDDSA key F028DE16D3B2AA440FE26F05CECC557729596616
 gpg: Good signature from "Seetrex Compliance Release Signing <release@seetrex.com>" [unknown]
 gpg: WARNING: This key is not certified with a trusted signature!
@@ -181,19 +178,19 @@ character. The `WARNING: This key is not certified with a trusted signature`
 line is *expected*: it says only that you have not personally certified the
 key in your GPG web of trust — the out-of-band fingerprint comparison is the
 check that replaces it. The earlier release tags (`seetrex-format-v1.0.0`,
-`seetrex-verifier-v0.2.0` and `seetrex-verifier-v0.3.0`) verify the same
-way with the same key.
+`seetrex-verifier-v0.2.0`, `seetrex-verifier-v0.3.0` and
+`seetrex-verifier-v0.3.1`) verify the same way with the same key.
 
 Then build in place — the repository pins its toolchain
 (`rust-toolchain.toml`, channel `1.91.1`) and commits its `Cargo.lock`:
 
 ```
-git checkout seetrex-verifier-v0.3.1
+git checkout seetrex-verifier-v0.3.2
 cargo test --locked          # all suites, including the CLI integration tests
 cargo build --release --locked   # produces target/release/seetrex-verifier
 ```
 
-Result on 2026-07-20 at the `seetrex-verifier-v0.3.1` tag: every suite passes
+Result on 2026-07-22 at the `seetrex-verifier-v0.3.2` tag: every suite passes
 (format, verifier library, and CLI tests), zero failures.
 
 ### 2.3 Route C — pin the signing key out of band
@@ -420,7 +417,7 @@ source rebuild under NDA for regulators. To arrange either, contact
 | Artifact | Where it lives | How it is pinned |
 |---|---|---|
 | Release-signing GPG key | `https://seetrex.com/.well-known/release-signing-pubkey.asc` AND `keys/release-signing-pubkey.asc` in the public repository | fingerprint `F028 DE16 D3B2 AA44 0FE2 6F05 CECC 5577 2959 6616`, cross-checked over the independent channels of section 2.3 (this document / vendor domain over TLS / the repository copy as a self-consistency check); compare by fingerprint, not file bytes; ed25519, expires 2028-07-09 |
-| Source repository | `https://github.com/seetrex-hq/seetrex-verifier` | GPG-signed release tags, verified with `git tag -v` against the pinned fingerprint: `seetrex-verifier-v0.3.2` (current release; its signed tag is created at publication — verify with `git tag -v` once present); superseded: `seetrex-verifier-v0.3.1` at commit `ecea6cc76f10…`, `seetrex-verifier-v0.3.0` at commit `719d0988a1bc…`, `seetrex-format-v1.0.0` and `seetrex-verifier-v0.2.0` at commit `f1dd053c82a1…` |
+| Source repository | `https://github.com/seetrex-hq/seetrex-verifier` | GPG-signed release tags, verified with `git tag -v` against the pinned fingerprint: `seetrex-verifier-v0.3.2` at commit `54676db4e66b…` (current); superseded: `seetrex-verifier-v0.3.1` at commit `ecea6cc76f10…`, `seetrex-verifier-v0.3.0` at commit `719d0988a1bc…`, `seetrex-format-v1.0.0` and `seetrex-verifier-v0.2.0` at commit `f1dd053c82a1…` |
 | `seetrex-format` `1.0.0` | crates.io | crates.io versions are immutable; pin with the exact requirement `=1.0.0` |
 | `seetrex-verifier` `0.3.2` | crates.io | immutable; install with `cargo install seetrex-verifier --locked --version 0.3.2` (ships the executable), or pin `=0.3.2` as a library dependency (itself pins `seetrex-format =1.0.0`). `0.3.0` and `0.3.1` stay downloadable forever and must not be used **as the executable**: their `verify-chain` trailers overstated the check's coverage (section 3). As a library they compute every hash and result identically, but their printed chain-scope wording (and two doc comments) carry the same overclaim `0.3.2` corrects — see appendix A |
 | Package format spec | `docs/SPEC_VERDICT_PACKAGE_V1.md` in the source repository | covered by the signed tag; the normative reference for every check in this kit |

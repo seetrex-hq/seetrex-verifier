@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the crates aim to follow [Semantic Versioning](https://semver.org/). Each
 entry's release date is the date of its signed tag.
 
-## [seetrex-verifier 0.3.2]
+## [seetrex-verifier 0.3.2] — 2026-07-22
 
 Scope-wording correction. The offline `verify-chain` and `verify-package`
 output and the library doc comments no longer claim more than the check
