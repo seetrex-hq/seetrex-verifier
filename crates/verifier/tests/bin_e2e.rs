@@ -384,6 +384,369 @@ fn version_and_help_are_sober_and_usage_errors_exit_2() {
     }
 }
 
+// ─── verify-anchor: CLI plumbing over verify_anchored_package ────────────
+//
+// These black-box tests pin the CLI CONTRACT (arg parsing, two trusted/untrusted
+// files, output vocabulary, exit codes) — NOT the crypto, which is exercised
+// against REAL test.sigsum.org vectors by the library tests in
+// `anchor_package.rs`. The success fixture carries NO leaves and NO rotations,
+// so the checkpoint crypto is not reached (an empty package verifies vacuously:
+// derive over zero rotations = {genesis}, no per-leaf inclusion, chain JOIN
+// only). The checkpoint values below are the REAL frozen ones anyway (public
+// data), so nothing here is fabricated.
+
+const A_CP_SIZE: u64 = 196372;
+const A_CP_ROOT: &str = "848aff0ecb7315a0fc1cc4a00c1065b51b4c269ff871dc2f048711892739a06e";
+const A_CP_LOG_SIG: &str = "c551769caf05b2cf2358d6b93f9582e1e878e2eb3ac65b06d20315dbf7ef78b0f9b956e82a215e61abe2f06d2b30d407e81e2f4247f3e0d03daa4436434c0503";
+const A_CP_TS: u64 = 1784740225;
+const A_KH_SMARTIT: &str = "42351ad474b29c04187fd0c8c7670656386f323f02e9a4ef0a0055ec061ecac8";
+const A_COSIG_SMARTIT: &str = "e8859da78c26b746a2a0c3350fe0e9984c0b99233887d50dff9f2738a8b88b77026b7022e0fc73d690c450fd5affad18db2d535178e2773e3e8d7738813b740d";
+const A_LOG_PK: &str = "4644af2abd40f4895a003bca350f9d5912ab301a49c77f13e5b6d905c20a5fe6";
+const A_WIT_NISSE: &str = "1c25f8a44c635457e2e391d1efbca7d4c2951a0aef06225a881e46b98962ac6c";
+const A_WIT_RGDD: &str = "28c92a5a3a054d317c86fc2eeb6a7ab2054d6217100d0be67ded5b74323c5806";
+const A_WIT_SMARTIT: &str = "f4855a0f46e8a3e23bb40faf260ee57ab8a18249fa402f2ca2d28a60e1a3130e";
+
+/// A minimal VALID `anchor.json` (3-row production chain, real checkpoint, no
+/// leaves) for `tenant`. Returns a `serde_json::Value` to write to disk.
+fn valid_anchor_json_value(tenant: &str) -> serde_json::Value {
+    let mut rows = Vec::new();
+    let mut prev: Option<String> = None;
+    for ordinal in 1..=3u32 {
+        let verdict_hash = format!("{ordinal:064x}");
+        let chain_hash = compute_chain_hash(prev.as_deref(), &verdict_hash);
+        rows.push(serde_json::json!({
+            "ordinal": ordinal,
+            "verdict_id": "00000000-0000-0000-0000-000000000000",
+            "verdict_hash": verdict_hash,
+            "chain_prev_hash": prev.clone(),
+            "chain_hash": chain_hash.clone(),
+            "appended_at": "2026-07-22T12:00:00Z",
+            "ruleset_id": "demo",
+            "verdict_outcome": "SATISFIED",
+        }));
+        prev = Some(chain_hash);
+    }
+    serde_json::json!({
+        "version": "seetrex/anchor/v1",
+        "tenant_slug": tenant,
+        "rows": rows,
+        "checkpoint": {
+            "size": A_CP_SIZE,
+            "root": A_CP_ROOT,
+            "log_signature": A_CP_LOG_SIG,
+            "cosignatures": [
+                {"key_hash": A_KH_SMARTIT, "timestamp": A_CP_TS, "signature": A_COSIG_SMARTIT}
+            ],
+        },
+        "anchored_leaves": [],
+        "rotations": [],
+    })
+}
+
+/// A VALID auditor kit for `tenant`: synthetic pinned genesis + the real
+/// Glasklar `sigsum-test1-2025` policy.
+fn valid_kit_json_value(tenant: &str) -> serde_json::Value {
+    serde_json::json!({
+        "version": "seetrex/anchor-kit/v1",
+        "tenant_slug": tenant,
+        "genesis_key_hash": "11".repeat(32),
+        "policy": {
+            "log_pubkey": A_LOG_PK,
+            "witnesses": [A_WIT_NISSE, A_WIT_RGDD, A_WIT_SMARTIT],
+            "quorum_k": 2,
+        },
+    })
+}
+
+/// INTENT: `verify-anchor` prints the v6 TWO-verdict result and NEVER the
+///         reserved strong token `VERIFIED`. A confirmed CONSISTENCIA with
+///         INCONCLUSIVE COMPLETITUD is not a blanket strong pass, and this
+///         surface is not §9.6-blessed to emit the reserved token.
+/// CONTEXT: the whole v6 redesign exists because a single "VERIFIED OFFLINE"
+///          was misread as completeness. The banner must carry CONSISTENCIA +
+///          COMPLETITUD explicitly, and the shell-tooling strong-pass token
+///          must be absent.
+/// EXPIRES IF: verify-anchor is deliberately blessed as a §9.6 strong surface
+///             (then the reserved-token policy for it is revised in that PR).
+#[test]
+fn test_scenario_verify_anchor_confirmed_offline_no_reserved_token() {
+    let tmp = tempdir();
+    let anchor = tmp.path().join("anchor.json");
+    let kit = tmp.path().join("kit.json");
+    write(&anchor, &valid_anchor_json_value("example-tenant"));
+    write(&kit, &valid_kit_json_value("example-tenant"));
+
+    let out = run(&[
+        "verify-anchor",
+        anchor.to_str().unwrap(),
+        "--kit",
+        kit.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "confirmed CONSISTENCIA must exit 0; stderr={}",
+        stderr(&out)
+    );
+    let so = stdout(&out);
+    assert!(so.contains("CONSISTENCIA CONFIRMED OFFLINE"), "banner missing: {so}");
+    assert!(
+        so.contains("COMPLETITUD") && so.contains("INCONCLUSIVE"),
+        "two-verdict honesty missing: {so}"
+    );
+    // The vacuous case (this fixture has zero leaves) must SHOW the count, so a
+    // confirmed-but-vacuous pass can never be misread as substantive (both
+    // blind reviewers flagged the silent-vacuous hazard).
+    assert!(
+        so.contains("anchored leaves checked: 0"),
+        "vacuous-pass leaf count not surfaced: {so}"
+    );
+    assert!(
+        !so.to_ascii_uppercase().contains("VERIFIED"),
+        "reserved strong token leaked on the anchor surface: {so}"
+    );
+}
+
+/// A kit auditing a DIFFERENT tenant than the package declares ⇒ the category
+/// guard fails CONSISTENCIA ⇒ exit 1 (a package failure, not a config error),
+/// and the reserved token must not leak on the failure path either.
+#[test]
+fn test_scenario_verify_anchor_tenant_mismatch_fails() {
+    let tmp = tempdir();
+    let anchor = tmp.path().join("anchor.json");
+    let kit = tmp.path().join("kit.json");
+    write(&anchor, &valid_anchor_json_value("example-tenant"));
+    write(&kit, &valid_kit_json_value("other-tenant"));
+
+    let out = run(&[
+        "verify-anchor",
+        anchor.to_str().unwrap(),
+        "--kit",
+        kit.to_str().unwrap(),
+    ]);
+    assert_eq!(out.status.code(), Some(1), "tenant mismatch is a CONSISTENCIA failure → exit 1");
+    let se = stderr(&out);
+    assert!(se.contains("CONSISTENCIA FAILED"), "failure line missing: {se}");
+    assert!(
+        !se.to_ascii_uppercase().contains("VERIFIED"),
+        "reserved token leaked on failure: {se}"
+    );
+}
+
+/// A malformed UNTRUSTED package ⇒ the material under audit cannot be verified
+/// ⇒ exit 1.
+#[test]
+fn verify_anchor_malformed_package_exits_1() {
+    let tmp = tempdir();
+    let anchor = tmp.path().join("anchor.json");
+    let kit = tmp.path().join("kit.json");
+    std::fs::write(&anchor, b"{ not valid json").unwrap();
+    write(&kit, &valid_kit_json_value("example-tenant"));
+
+    let out = run(&[
+        "verify-anchor",
+        anchor.to_str().unwrap(),
+        "--kit",
+        kit.to_str().unwrap(),
+    ]);
+    assert_eq!(out.status.code(), Some(1), "malformed package → exit 1");
+}
+
+/// A malformed AUDITOR KIT is the auditor's own config error ⇒ exit 2, kept
+/// distinct from exit 1 (a vendor-package failure).
+#[test]
+fn verify_anchor_malformed_kit_exits_2() {
+    let tmp = tempdir();
+    let anchor = tmp.path().join("anchor.json");
+    let kit = tmp.path().join("kit.json");
+    write(&anchor, &valid_anchor_json_value("example-tenant"));
+    let mut bad_kit = valid_kit_json_value("example-tenant");
+    bad_kit["version"] = serde_json::json!("seetrex/anchor-kit/v2");
+    write(&kit, &bad_kit);
+
+    let out = run(&[
+        "verify-anchor",
+        anchor.to_str().unwrap(),
+        "--kit",
+        kit.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "malformed kit is a config error → exit 2; stderr={}",
+        stderr(&out)
+    );
+}
+
+/// Missing `--kit` is a usage error ⇒ exit 2.
+#[test]
+fn verify_anchor_missing_kit_is_usage_error() {
+    let tmp = tempdir();
+    let anchor = tmp.path().join("anchor.json");
+    write(&anchor, &valid_anchor_json_value("example-tenant"));
+    let out = run(&["verify-anchor", anchor.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(2), "missing --kit is a usage error → exit 2");
+}
+
+// ─── verify-anchor --monitor: real enumeration round-trip ────────────────
+//
+// These feed the REAL `scripts/gate46/fb2c_enumeration_oracle.json` monitor
+// bundle (a FULL-SCAN enumeration under the real SUBMITTER_KH against
+// test.sigsum.org) into the CLI so COMPLETITUD becomes a REAL verdict, not the
+// offline INCONCLUSIVE default. `consistency_proof` in the oracle is `[]`
+// (degenerate), so the PACKAGE checkpoint MUST equal the oracle's `c_audit`.
+
+/// The real submitter key_hash of the enumerated captured leaves — the genesis
+/// of the round-trip (overwrites the kit's `genesis_key_hash`).
+const SUBMITTER_KH: &str = "b112398d0e531a2a1e49ac5a7e2d8d7cd80ab69485e7c97f36ad893ca543717d";
+
+fn fb2c_oracle_path() -> std::path::PathBuf {
+    // The frozen enumeration oracle ships WITH the crate (tests/fixtures/), so
+    // this e2e runs identically in the private tree and in the exported public
+    // tree — a path outside the crate would silently drop the --monitor
+    // coverage from the published artifact.
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/fb2c_enumeration_oracle.json")
+}
+fn fb2c_oracle_value() -> serde_json::Value {
+    serde_json::from_str(&std::fs::read_to_string(fb2c_oracle_path()).unwrap()).unwrap()
+}
+
+/// Test 1 — real oracle round-trip: the monitor's real enumeration of our 4
+/// leaves (including an on-chain rotate + heads the package omitted) turns the
+/// vacuous offline CONSISTENCIA pass into a REAL, non-INCONCLUSIVE COMPLETITUD
+/// verdict. OBSERVED verdict = FAILED ⇒ exit 1 (see report for the reason).
+#[test]
+fn verify_anchor_real_monitor_completitud_downgrades() {
+    let tmp = tempdir();
+    let anchor = tmp.path().join("anchor.json");
+    let kit = tmp.path().join("kit.json");
+    let mut a = valid_anchor_json_value("example-tenant");
+    a["checkpoint"] = fb2c_oracle_value()["c_audit"].clone();
+    let mut k = valid_kit_json_value("example-tenant");
+    k["genesis_key_hash"] = serde_json::json!(SUBMITTER_KH);
+    write(&anchor, &a);
+    write(&kit, &k);
+    // The committed oracle is now pure wire-schema, so feed it RAW to the CLI —
+    // exactly the file a real monitor emits and an auditor consumes unmodified.
+    let out = run(&[
+        "verify-anchor",
+        anchor.to_str().unwrap(),
+        "--kit",
+        kit.to_str().unwrap(),
+        "--monitor",
+        fb2c_oracle_path().to_str().unwrap(),
+    ]);
+    let combined = format!("{}{}", stdout(&out), stderr(&out));
+    // The offline package is vacuous (CONSISTENCIA verifies), but the monitor's
+    // real enumeration makes COMPLETITUD a real verdict that FAILS closed ⇒
+    // exit 1.
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "monitor must downgrade the vacuous pass; combined={combined}"
+    );
+    assert!(
+        combined.contains("COMPLETITUD") && combined.contains("FAILED"),
+        "real COMPLETITUD verdict missing: {combined}"
+    );
+    // Pin a distinctive substring of the REAL rule-failure reason so this test
+    // distinguishes a genuine COMPLETITUD RULE failure (the monitor enumerates
+    // HEAD@42 while the published chain is only N=3 rows — a truncated tail whose
+    // leaf still sits in the log, G-v6-2) from a mere auth/plumbing failure that
+    // would also print "FAILED". Stable across oracle regen (independent of tree
+    // size / leaf indices).
+    assert!(
+        combined.contains("rows were truncated while their tail leaf stays in the log"),
+        "expected the real G-v6-2 truncation reason, got: {combined}"
+    );
+    assert!(
+        !combined.to_ascii_uppercase().contains("VERIFIED"),
+        "reserved token leaked: {combined}"
+    );
+}
+
+/// Test 2 — an empty honest monitor (enumerated NOTHING under our identity at
+/// this C_audit) RAISES COMPLETITUD to CONFIRMED: nothing to contradict, and
+/// the package anchored nothing either ⇒ no omission. Clean plumbing check.
+#[test]
+fn verify_anchor_empty_honest_monitor_confirms_completitud() {
+    let tmp = tempdir();
+    let anchor = tmp.path().join("anchor.json");
+    let kit = tmp.path().join("kit.json");
+    let monitor = tmp.path().join("monitor.json");
+    let c_audit = fb2c_oracle_value()["c_audit"].clone();
+    let mut a = valid_anchor_json_value("example-tenant");
+    a["checkpoint"] = c_audit.clone();
+    write(&anchor, &a);
+    write(&kit, &valid_kit_json_value("example-tenant"));
+    // C_audit == package checkpoint ⇒ degenerate consistency (empty proof).
+    write(
+        &monitor,
+        &serde_json::json!({
+            "version": "seetrex/anchor-monitor/v1",
+            "c_audit": c_audit,
+            "leaves": [],
+            "consistency_proof": [],
+            "observations": [],
+        }),
+    );
+    let out = run(&[
+        "verify-anchor",
+        anchor.to_str().unwrap(),
+        "--kit",
+        kit.to_str().unwrap(),
+        "--monitor",
+        monitor.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "empty honest monitor must confirm; stderr={}",
+        stderr(&out)
+    );
+    let so = stdout(&out);
+    assert!(
+        so.contains("COMPLETITUD") && so.contains("CONFIRMED"),
+        "COMPLETITUD not raised to confirmed: {so}"
+    );
+    assert!(!so.to_ascii_uppercase().contains("VERIFIED"), "reserved token leaked: {so}");
+}
+
+/// Test 3 — a malformed monitor bundle is the AUDITOR's own config error ⇒
+/// exit 2 (kept distinct from exit 1, a vendor-package failure).
+#[test]
+fn verify_anchor_malformed_monitor_exits_2() {
+    let tmp = tempdir();
+    let anchor = tmp.path().join("anchor.json");
+    let kit = tmp.path().join("kit.json");
+    let monitor = tmp.path().join("monitor.json");
+    write(&anchor, &valid_anchor_json_value("example-tenant"));
+    write(&kit, &valid_kit_json_value("example-tenant"));
+    std::fs::write(&monitor, b"{not valid json").unwrap();
+    let out = run(&[
+        "verify-anchor",
+        anchor.to_str().unwrap(),
+        "--kit",
+        kit.to_str().unwrap(),
+        "--monitor",
+        monitor.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "malformed monitor bundle is an auditor CONFIG error → exit 2; stderr={}",
+        stderr(&out)
+    );
+    assert!(
+        !format!("{}{}", stdout(&out), stderr(&out))
+            .to_ascii_uppercase()
+            .contains("VERIFIED"),
+        "reserved token leaked: {}",
+        stderr(&out)
+    );
+}
+
 // ─── tiny tempdir helper (no tempfile dev-dependency) ────────────────────
 
 struct TempDir(PathBuf);

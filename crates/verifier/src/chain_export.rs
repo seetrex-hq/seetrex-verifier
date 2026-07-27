@@ -40,6 +40,7 @@ pub const PUBLIC_CHAIN_SCHEMA_VERSION: &str = "1.0";
 /// - `verdict_id`/`appended_at`: committed NOWHERE. Inputs neither
 ///   to the chain link nor to `VerdictCanonicalInput` (v1 or v2),
 ///   so no artifact we publish binds them.
+///
 /// `ordinal` is hashed nowhere either, but is not free: this module
 /// requires it contiguous 1..=N. That contiguity is internal to the
 /// file you hold; it does not pin N against a shorter file, so
@@ -276,10 +277,19 @@ impl From<PackageParseError> for PackageVerifyError {
     }
 }
 
-/// Parse an auditor-supplied package (the downloaded `<slug>-chain.json`)
-/// and verify it OFFLINE. This is the pure core the `verify-chain`
-/// CLI surfaces are thin wrappers over — no DB, no network.
-pub fn parse_and_verify_package(raw: &str) -> Result<ChainHead, PackageVerifyError> {
+/// Parse an auditor-supplied package (the downloaded `<slug>-chain.json`),
+/// verify it OFFLINE, and return BOTH the verified rows and the head —
+/// one pass through the full gate (envelope parse + schema_version +
+/// [`verify_public_chain`]). No DB, no network.
+///
+/// This is the entry point for consumers that need the row CONTENTS of a
+/// package they can trust (e.g. the witness expectation builder derives
+/// per-row HEAD lanes from it): the rows come back only if the whole
+/// package verified, so there is no way to obtain rows that skipped the
+/// gate.
+pub fn parse_and_verify_package_rows(
+    raw: &str,
+) -> Result<(Vec<PublicChainRow>, ChainHead), PackageVerifyError> {
     let export: PublicChainExport =
         serde_json::from_str(raw).map_err(|e| PackageParseError::Malformed {
             detail: format!("json deserialize failed at line {} col {}", e.line(), e.column()),
@@ -290,7 +300,16 @@ pub fn parse_and_verify_package(raw: &str) -> Result<ChainHead, PackageVerifyErr
         }
         .into());
     }
-    verify_public_chain(&export.chain).map_err(PackageVerifyError::Chain)
+    let head = verify_public_chain(&export.chain).map_err(PackageVerifyError::Chain)?;
+    Ok((export.chain, head))
+}
+
+/// Parse an auditor-supplied package (the downloaded `<slug>-chain.json`)
+/// and verify it OFFLINE. This is the pure core the `verify-chain`
+/// CLI surfaces are thin wrappers over — no DB, no network. Head-only
+/// projection of [`parse_and_verify_package_rows`] (single implementation).
+pub fn parse_and_verify_package(raw: &str) -> Result<ChainHead, PackageVerifyError> {
+    parse_and_verify_package_rows(raw).map(|(_rows, head)| head)
 }
 
 #[cfg(test)]
@@ -552,5 +571,68 @@ mod tests {
             err,
             PackageVerifyError::Parse(PackageParseError::Malformed { .. })
         ));
+    }
+
+    /// INTENT: `parse_and_verify_package_rows` applies the FULL package
+    ///         gate (envelope parse + schema_version + chain verify) in
+    ///         ONE pass and hands back the VERIFIED rows together with
+    ///         the head — so a consumer that needs the rows (the witness
+    ///         expectation builder) never has to re-parse or re-verify,
+    ///         and can never obtain rows that skipped the gate.
+    /// CONTEXT: `parse_and_verify_package` discards the rows, which forced
+    ///          downstream consumers to raw-parse the export — a documented
+    ///          debt. This entry point closes that gap.
+    /// EXPIRES IF: schema_version 2.x introduces its own parser/verify
+    ///             dispatch.
+    #[test]
+    fn test_intent_package_rows_returns_verified_rows_and_head() {
+        let rows = valid_chain(3);
+        let expected_head = rows.last().unwrap().chain_hash.clone();
+        let json = serde_json::to_string(&PublicChainExport::new(rows)).unwrap();
+        let (got_rows, head) =
+            parse_and_verify_package_rows(&json).expect("valid package verifies");
+        assert_eq!(head.verdict_count, 3);
+        assert_eq!(head.last_chain_hash, expected_head);
+        assert_eq!(got_rows.len(), 3);
+        // The returned rows ARE the verified chain, in order.
+        for (i, row) in got_rows.iter().enumerate() {
+            assert_eq!(row.ordinal, (i + 1) as u32);
+        }
+        assert_eq!(got_rows.last().unwrap().chain_hash, expected_head);
+    }
+
+    /// The rows entry point enforces the SAME schema_version gate as the
+    /// head-only one — no rows come back from an alien-schema package.
+    #[test]
+    fn package_rows_rejects_unknown_schema_version() {
+        let mut export = PublicChainExport::new(valid_chain(1));
+        export.schema_version = "9.9".to_string();
+        let json = serde_json::to_string(&export).unwrap();
+        let err = parse_and_verify_package_rows(&json).expect_err("alien schema must fail");
+        assert!(matches!(
+            err,
+            PackageVerifyError::Parse(PackageParseError::UnsupportedSchemaVersion { .. })
+        ));
+    }
+
+    /// The rows entry point refuses a broken chain — no rows come back
+    /// from a package whose hash links do not verify.
+    #[test]
+    fn package_rows_rejects_broken_chain() {
+        let mut rows = valid_chain(2);
+        rows[1].chain_hash = "d".repeat(64);
+        let json = serde_json::to_string(&PublicChainExport::new(rows)).unwrap();
+        let err = parse_and_verify_package_rows(&json).expect_err("broken chain must fail");
+        assert!(matches!(err, PackageVerifyError::Chain(_)));
+    }
+
+    /// `parse_and_verify_package` is a thin projection of the rows entry
+    /// point: same input, same head — one implementation, two shapes.
+    #[test]
+    fn package_head_agrees_with_package_rows_head() {
+        let json = serde_json::to_string_pretty(&PublicChainExport::new(valid_chain(4))).unwrap();
+        let head_only = parse_and_verify_package(&json).unwrap();
+        let (_, head_from_rows) = parse_and_verify_package_rows(&json).unwrap();
+        assert_eq!(head_only, head_from_rows);
     }
 }

@@ -12,6 +12,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the crates aim to follow [Semantic Versioning](https://semver.org/). Each
 entry's release date is the date of its signed tag.
 
+## [seetrex-verifier 0.3.3] — 2026-07-27
+
+Additive release: external-anchor verification. A new `verify-anchor`
+subcommand checks a producer-published `anchor.json` package OFFLINE against
+a transparency log's cosigned checkpoint. Existing commands, formats and
+exit codes are unchanged; 0.3.2 remains valid for `verify-chain` /
+`verify-package`.
+
+### Added
+- `verify-anchor <anchor.json> --kit <kit.json> [--monitor <bundle>]`: the
+  two-verdict anchor gate. `CONSISTENCIA` (offline) re-serializes every
+  anchored leaf to the canonical `seetrex/anchor/v1` preimage, verifies each
+  leaf's RFC 9162 Merkle inclusion under a checkpoint cosigned by a PINNED
+  witness quorum, derives the producer identity set from the PINNED genesis
+  key via authorized `rotate` leaves, and checks the package JOIN.
+  `COMPLETITUD` stays INCONCLUSIVE unless an independent monitor enumeration
+  is supplied with `--monitor`, in which case the completeness rules run for
+  real (omission, fork, freshness by consistency proof, per-slug lane rules).
+  The witness policy, genesis key and tenant slug come from the auditor kit
+  file, never from the untrusted package.
+- Library modules backing the subcommand, all public: `anchor` (preimage
+  convention + JOIN), `merkle` (RFC 9162 inclusion and consistency proofs,
+  verified against live-log vectors), `checkpoint`
+  (cosigned-checkpoint + witness-quorum verification, Ed25519 verify-only),
+  `anchor_completitud` (the enumeration-dependent rules engine) and
+  `anchor_package` (`anchor.json` transport + orchestration).
+- `chain_export::parse_and_verify_package_rows`: hands back the VERIFIED
+  rows together with the head, so a consumer that needs row contents can
+  never obtain rows that skipped the verification gate.
+
+### Dependencies
+- New: `ed25519-dalek` 2 (`default-features = false`), verification only —
+  the crate never signs.
+
 ## [seetrex-verifier 0.3.2] — 2026-07-22
 
 Scope-wording correction. The offline `verify-chain` and `verify-package`

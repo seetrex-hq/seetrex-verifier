@@ -1,0 +1,157 @@
+{
+  "version": "seetrex/anchor-monitor/v1",
+  "c_audit": {
+    "size": 196827,
+    "root": "4310c21baef5e620066ff9d3f61b246f0f009985eebca9a6127540905c6da3b8",
+    "log_signature": "f31c0d52d7c5038c63d31ee0d4099ebef71a2a6e9373ad9c592d3f73ad3cb340b39d05c4a70e534b4fdd2f82a500688fc28f2dc405b25f28f9f7111086555a07",
+    "cosignatures": [
+      {
+        "key_hash": "1c997261f16e6e81d13f420900a2542a4b6a049c2d996324ee5d82a90ca3360c",
+        "timestamp": 1784810287,
+        "signature": "e7150b0d26d2405ccb9144034d988b8e65538a6e02e03e4ca4f3aa12d3e04d9828b86f8106648744a72616d86943336b91bb70d9b8dc9be8d49bc034d4b8c108"
+      },
+      {
+        "key_hash": "70b861a010f25030de6ff6a5267e0b951e70c04b20ba4a3ce41e7fba7b9b7dfc",
+        "timestamp": 1784810287,
+        "signature": "e7699d810877cd853a28c2f706d3c749fc1fb08ca3092338169de78ee05401678f1c94b7de7db31d3e9827b335c8e20c2e441033e4579cbf676fdab49a051607"
+      },
+      {
+        "key_hash": "42351ad474b29c04187fd0c8c7670656386f323f02e9a4ef0a0055ec061ecac8",
+        "timestamp": 1784810287,
+        "signature": "475b1a942ff3d8586bd39b2bc336ff5cfd3ff443dcc38cbaca94d0946ddfdc76c75260b343a4aed16c72091ef367c13083a4ad990a885b38775c3a1491aa6309"
+      }
+    ]
+  },
+  "leaves": [
+    {
+      "lane": {
+        "kind": "head",
+        "slug": "example-tenant",
+        "ordinal": 42,
+        "chain_hash": "5fe66186d8e2100608f5b914fe260f08c57cc894087966a637f452a0f606c689"
+      },
+      "submitter_signature": "9bb51335303c5c0a6cc7917ea97fbc5490b25b7f5bf320bdb8d678c688cc04a706d2c57e31824d6f80e6e1616666b7d871d7453c4830fc4440ab478a42015507",
+      "submitter_key_hash": "b112398d0e531a2a1e49ac5a7e2d8d7cd80ab69485e7c97f36ad893ca543717d",
+      "index": 196053,
+      "inclusion_proof": [
+        "57954ec27540bec161ffebe796ad23ca9d3769cc131245e395fb0a3a397d130e",
+        "771576ed460260a46ab3737e206f54beff92230ca8811f278deac631447e0470",
+        "c5b5a29c5c1b4c04a558f70e40bc9577d2324cbea66e1c859bc3d4f26c58d83e",
+        "1f86b8529603e401c6e43f17dd0d3c4ab1b6699052c9b04ffb9267b0836fb26f",
+        "6d341bc07fafaf60392044e64cf9eaa12bdd97b589a645c860f2d2c9c2925aac",
+        "86e3e828b940919b1fe34cbf238eaae3d4561dcaf974e828a855175d8b65fdeb",
+        "e8678a6c7e857d489d6fcefd4bbfcf6c9168b2b4e29395d7aa5f8371ae610737",
+        "e029a3edb1e91b2f65f569627fd19a592fe3a9221ce01819f58dc7bd31ae98ad",
+        "60f3a15100b723cb4b37c79e1b39b0f3bf39326fbb810c59e13fe32d14105fe0",
+        "78b5dadf3744c54f0e9dc50b582dfb31cb321f490c9734c0c5b712472b596473",
+        "ce7d3d60bddef51351c90ed469c5140030a6e8f87a87d6b4f20cd8eaf6c55081",
+        "425bdfab555c08a4ca2f753da727ffc34f01c568eb0bd7cf27603bd8a29d55f3",
+        "2ebbadd1c82f077533f2904f4cc3e89fa9112d97ac982115b4f92d08e759b5ce",
+        "2f22287841aca348a0e5e38650bfc1506744dc6acc06b5812bdce30c399ead98",
+        "84b0f8a1d9c6e04ab627cde4506c9a7105683a935e8a3d988176d12b191e3f28",
+        "20065aca59c5b73c0fd5cf20ddeecc66b5f054b6bcf13c6a05bc0e374ab8423c",
+        "15dd8ea055aae66908a218b6ee784576119a3e1752cd36cb5375766179e43422",
+        "43bd28c79dec46786a85bdf0fe72eac3985a8fa172979cdbf7dc04d6c506d43d"
+      ]
+    },
+    {
+      "lane": {
+        "kind": "enroll",
+        "slug": "example-tenant",
+        "mode": "attested"
+      },
+      "submitter_signature": "9991b99170de64c2faaa233320137e5270d889663333ebf26af36cad4635bd0ca04eff2ac8ed4748f6f779441f02a9a36dcf4bd05df6f65ba3da573c8558d50b",
+      "submitter_key_hash": "b112398d0e531a2a1e49ac5a7e2d8d7cd80ab69485e7c97f36ad893ca543717d",
+      "index": 196054,
+      "inclusion_proof": [
+        "7c98fc61727e90557886db44986fb40cc7df2198401a3b1638eafb5a70604511",
+        "d3d874e73321fc43bf5ecb08d26e6f6a1a6ae60a770ab34fabd1208ba6753574",
+        "c5b5a29c5c1b4c04a558f70e40bc9577d2324cbea66e1c859bc3d4f26c58d83e",
+        "1f86b8529603e401c6e43f17dd0d3c4ab1b6699052c9b04ffb9267b0836fb26f",
+        "6d341bc07fafaf60392044e64cf9eaa12bdd97b589a645c860f2d2c9c2925aac",
+        "86e3e828b940919b1fe34cbf238eaae3d4561dcaf974e828a855175d8b65fdeb",
+        "e8678a6c7e857d489d6fcefd4bbfcf6c9168b2b4e29395d7aa5f8371ae610737",
+        "e029a3edb1e91b2f65f569627fd19a592fe3a9221ce01819f58dc7bd31ae98ad",
+        "60f3a15100b723cb4b37c79e1b39b0f3bf39326fbb810c59e13fe32d14105fe0",
+        "78b5dadf3744c54f0e9dc50b582dfb31cb321f490c9734c0c5b712472b596473",
+        "ce7d3d60bddef51351c90ed469c5140030a6e8f87a87d6b4f20cd8eaf6c55081",
+        "425bdfab555c08a4ca2f753da727ffc34f01c568eb0bd7cf27603bd8a29d55f3",
+        "2ebbadd1c82f077533f2904f4cc3e89fa9112d97ac982115b4f92d08e759b5ce",
+        "2f22287841aca348a0e5e38650bfc1506744dc6acc06b5812bdce30c399ead98",
+        "84b0f8a1d9c6e04ab627cde4506c9a7105683a935e8a3d988176d12b191e3f28",
+        "20065aca59c5b73c0fd5cf20ddeecc66b5f054b6bcf13c6a05bc0e374ab8423c",
+        "15dd8ea055aae66908a218b6ee784576119a3e1752cd36cb5375766179e43422",
+        "43bd28c79dec46786a85bdf0fe72eac3985a8fa172979cdbf7dc04d6c506d43d"
+      ]
+    },
+    {
+      "lane": {
+        "kind": "retired",
+        "slug": "example-tenant",
+        "ordinal_final": 128,
+        "chain_hash_final": "bdb9175e8d400bcbb455f95046eaad430f7129a779b9b0a60fa2bb3641a6083c"
+      },
+      "submitter_signature": "153459c5b78fe0900b934269b7646df0ce5812c67f3767f359d3977dea275ae9833e61ba0ad221f3ea822b553dbcb3d664194dcb1410ca0f0e377e8742327608",
+      "submitter_key_hash": "b112398d0e531a2a1e49ac5a7e2d8d7cd80ab69485e7c97f36ad893ca543717d",
+      "index": 196055,
+      "inclusion_proof": [
+        "79463743931b54322d204fe3e0b0e204ac6c8583d80c13eff484769bf1cc54b5",
+        "d3d874e73321fc43bf5ecb08d26e6f6a1a6ae60a770ab34fabd1208ba6753574",
+        "c5b5a29c5c1b4c04a558f70e40bc9577d2324cbea66e1c859bc3d4f26c58d83e",
+        "1f86b8529603e401c6e43f17dd0d3c4ab1b6699052c9b04ffb9267b0836fb26f",
+        "6d341bc07fafaf60392044e64cf9eaa12bdd97b589a645c860f2d2c9c2925aac",
+        "86e3e828b940919b1fe34cbf238eaae3d4561dcaf974e828a855175d8b65fdeb",
+        "e8678a6c7e857d489d6fcefd4bbfcf6c9168b2b4e29395d7aa5f8371ae610737",
+        "e029a3edb1e91b2f65f569627fd19a592fe3a9221ce01819f58dc7bd31ae98ad",
+        "60f3a15100b723cb4b37c79e1b39b0f3bf39326fbb810c59e13fe32d14105fe0",
+        "78b5dadf3744c54f0e9dc50b582dfb31cb321f490c9734c0c5b712472b596473",
+        "ce7d3d60bddef51351c90ed469c5140030a6e8f87a87d6b4f20cd8eaf6c55081",
+        "425bdfab555c08a4ca2f753da727ffc34f01c568eb0bd7cf27603bd8a29d55f3",
+        "2ebbadd1c82f077533f2904f4cc3e89fa9112d97ac982115b4f92d08e759b5ce",
+        "2f22287841aca348a0e5e38650bfc1506744dc6acc06b5812bdce30c399ead98",
+        "84b0f8a1d9c6e04ab627cde4506c9a7105683a935e8a3d988176d12b191e3f28",
+        "20065aca59c5b73c0fd5cf20ddeecc66b5f054b6bcf13c6a05bc0e374ab8423c",
+        "15dd8ea055aae66908a218b6ee784576119a3e1752cd36cb5375766179e43422",
+        "43bd28c79dec46786a85bdf0fe72eac3985a8fa172979cdbf7dc04d6c506d43d"
+      ]
+    },
+    {
+      "lane": {
+        "kind": "rotate",
+        "rot_ordinal": 7,
+        "key_hash_old": "fa3580190786e1de2c17600bc6ce2e2785656b6b7c20154f14de9f39927bde77",
+        "key_hash_new": "b1a5b27125d5774fa89405492bab3ef3b2a941f0307e21b0b0116668a161d2c4"
+      },
+      "submitter_signature": "bf93e2454755ad71d54c2b31d93199907a18a87baeb27cf56ff7cf458d7f372826592c4fde26a787d486520ee6245795112f5aef36b6c22e039e68ec75f57403",
+      "submitter_key_hash": "b112398d0e531a2a1e49ac5a7e2d8d7cd80ab69485e7c97f36ad893ca543717d",
+      "index": 196056,
+      "inclusion_proof": [
+        "14020122279afd01f4ae7e54bd8482453cc5a8b1d6c91ef26e6721076a1be0c8",
+        "aa069aabd8ec74fff7edc10388706f1f8dd6b5f5093cf8cda0840c07adfb7c4c",
+        "a99f3c8c69c4842f0f117aeef8638f512c6aaf9f2a6b318532e96f1351c0bd5a",
+        "30e0bba48fe634f6815ae77c2d457e78f6593a983225957efb10373d16263c98",
+        "6d341bc07fafaf60392044e64cf9eaa12bdd97b589a645c860f2d2c9c2925aac",
+        "86e3e828b940919b1fe34cbf238eaae3d4561dcaf974e828a855175d8b65fdeb",
+        "e8678a6c7e857d489d6fcefd4bbfcf6c9168b2b4e29395d7aa5f8371ae610737",
+        "e029a3edb1e91b2f65f569627fd19a592fe3a9221ce01819f58dc7bd31ae98ad",
+        "60f3a15100b723cb4b37c79e1b39b0f3bf39326fbb810c59e13fe32d14105fe0",
+        "78b5dadf3744c54f0e9dc50b582dfb31cb321f490c9734c0c5b712472b596473",
+        "ce7d3d60bddef51351c90ed469c5140030a6e8f87a87d6b4f20cd8eaf6c55081",
+        "425bdfab555c08a4ca2f753da727ffc34f01c568eb0bd7cf27603bd8a29d55f3",
+        "2ebbadd1c82f077533f2904f4cc3e89fa9112d97ac982115b4f92d08e759b5ce",
+        "2f22287841aca348a0e5e38650bfc1506744dc6acc06b5812bdce30c399ead98",
+        "84b0f8a1d9c6e04ab627cde4506c9a7105683a935e8a3d988176d12b191e3f28",
+        "20065aca59c5b73c0fd5cf20ddeecc66b5f054b6bcf13c6a05bc0e374ab8423c",
+        "15dd8ea055aae66908a218b6ee784576119a3e1752cd36cb5375766179e43422",
+        "43bd28c79dec46786a85bdf0fe72eac3985a8fa172979cdbf7dc04d6c506d43d"
+      ]
+    }
+  ],
+  "consistency_proof": [],
+  "observations": [
+    {
+      "slug": "example-tenant",
+      "served": true
+    }
+  ]
+}

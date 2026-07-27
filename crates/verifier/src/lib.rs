@@ -26,6 +26,18 @@
 //!   through the shared `seetrex-format` JCS primitive.
 //! - [`hash`] — `sha256_hex`, the raw-bytes → lowercase-hex SHA-256
 //!   primitive shared by package verification and the CLI replay path.
+//! - [`merkle`] — RFC 6962 inclusion-proof verification (`verify_inclusion`),
+//!   the pure offline half of the anchor `CONSISTENCIA` inclusion check
+//!   (offline half); the cosigned-checkpoint half that authenticates the
+//!   root lives in `checkpoint`.
+//! - [`anchor`] — the external-anchor `seetrex/anchor/v1` preimage
+//!   convention and the two-verdict `CONSISTENCIA`/`COMPLETITUD` core.
+//! - [`anchor_package`] — the `anchor.json` transport (serde) and the
+//!   package-level orchestration `verify_anchored_package`:
+//!   the rotate-inclusion gate (rotate inclusion → identity) wired with
+//!   per-leaf inclusion and the package JOIN; witness policy and pinned
+//!   genesis are
+//!   auditor-kit inputs, never carried in the untrusted package.
 //! - [`package`] — `verify_package`: offline package-integrity
 //!   verification — the logic the `verify-package` CLI subcommand is a
 //!   thin shell over.
@@ -43,11 +55,16 @@
 //! stack (sqlx, axum, reqwest, tokio, aws-*, …) — enforced by
 //! `test_intent_verifier_crate_dependency_purity`.
 
+pub mod anchor;
+pub mod anchor_completitud;
+pub mod anchor_package;
 pub mod canonical;
 pub mod chain;
 pub mod chain_export;
+pub mod checkpoint;
 pub mod evidence;
 pub mod hash;
+pub mod merkle;
 pub mod package;
 pub mod rulesets;
 pub mod scope;

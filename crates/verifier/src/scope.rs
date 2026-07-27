@@ -55,3 +55,60 @@ pub const SCOPE_LINK_CLAIM: &str = "A match proves this file agrees with what \
     should extend the prefix you already hold, not rewrite it; keeping and \
     comparing that material is your step. This tool has no command for either \
     comparison; you must keep the material and make it yourself.";
+
+/// The scope statement printed by `seetrex-verifier verify-anchor` on EVERY
+/// terminal outcome — CONSISTENCIA confirmed OR failed, monitor supplied or
+/// not. An OFFLINE anchor verification confirms CONSISTENCIA (non-contradiction
+/// of the PRESENTED material); the second verdict, COMPLETITUD, is INCONCLUSIVE
+/// UNLESS an independent monitor enumeration is supplied (`--monitor`), in
+/// which case it carries a REAL verdict shown on the COMPLETITUD line above.
+/// Stated at the same volume as the result so a confirmed CONSISTENCIA WITHOUT
+/// a monitor can never be misread as completeness — the exact overclaim the v6
+/// redesign removed. Deliberately free of the reserved token `VERIFIED`:
+/// `verify-anchor` is not (yet) a §9.6-blessed strong surface, so no terminal
+/// outcome here is a blanket strong pass. The wording is honest on BOTH paths:
+/// it does not assert a fixed "INCONCLUSIVE here", it states the CONDITION
+/// (monitor present or absent) that decides COMPLETITUD.
+pub const SCOPE_ANCHOR: &str = "CONSISTENCIA (offline) confirms only that the \
+    PRESENTED material does not contradict itself: every anchored leaf's \
+    inclusion under the cosigned checkpoint verifies, the producer identity \
+    chain derives from the PINNED genesis without a fork, and the chain JOIN \
+    holds. It does NOT prove COMPLETITUD: a vendor who OMITS a contradictory \
+    log leaf republishes a shorter, self-consistent history that still passes \
+    CONSISTENCIA — catching omission needs an INDEPENDENT monitor enumeration \
+    of the log. That second verdict, COMPLETITUD, is INCONCLUSIVE unless you \
+    supply such an enumeration (--monitor <bundle>); with one it becomes a \
+    REAL verdict (CONFIRMED / INCONCLUSIVE / FAILED) shown on the COMPLETITUD \
+    line above, and WITHOUT one a confirmed CONSISTENCIA is NOT a statement \
+    that the vendor anchored everything. A confirmed verdict over ZERO anchored \
+    leaves is VACUOUS — it asserts nothing about anchoring; read the 'anchored \
+    leaves checked' count. Surfaced anomalous rotations (e.g. unauthorized) do \
+    NOT lower CONSISTENCIA — their fatal mapping is enumeration-dependent \
+    (COMPLETITUD); investigate them separately. The witness policy and \
+    genesis key used here are PINNED inputs from your auditor kit, never from \
+    the package.";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The anchor scope statement must (a) carry no reserved `VERIFIED` token
+    /// (the shell tooling reads it as a strong pass), and (b) actually state
+    /// the two-verdict honesty — that COMPLETITUD is INCONCLUSIVE and that a
+    /// confirmed CONSISTENCIA is not completeness.
+    #[test]
+    fn scope_anchor_is_honest_and_carries_no_reserved_token() {
+        assert!(
+            !SCOPE_ANCHOR.to_ascii_uppercase().contains("VERIFIED"),
+            "SCOPE_ANCHOR must not contain the reserved strong token"
+        );
+        assert!(SCOPE_ANCHOR.contains("INCONCLUSIVE"));
+        assert!(SCOPE_ANCHOR.contains("COMPLETITUD"));
+        assert!(SCOPE_ANCHOR.contains("does NOT prove"));
+        // The vacuous-pass and surfaced-anomaly caveats must be present (both
+        // blind reviewers flagged the silent-vacuous hazard).
+        assert!(SCOPE_ANCHOR.contains("VACUOUS"));
+        assert!(SCOPE_ANCHOR.contains("anchored leaves checked"));
+        assert!(SCOPE_ANCHOR.contains("anomalous rotations"));
+    }
+}

@@ -29,16 +29,13 @@ pub struct Fact {
 /// Serialization shape:
 /// - `Date`     → JSON string in ISO 8601 date format, e.g. `"2026-05-13"`.
 /// - `DateTime` → JSON string in ISO 8601 UTC datetime, e.g.
-///                `"2026-05-13T14:30:00Z"`. UTC ONLY at the format
-///                boundary; timezone normalization is the caller's
-///                responsibility.
-/// - `Duration` → JSON string in humantime-like format:
-///                `"30d"`, `"48h"`, `"10m"`, `"5s"`, or combinations
-///                like `"1h30m"`. Stored internally as
-///                `chrono::Duration` (signed seconds-level). A JSON
-///                integer would collide with `Number(f64)` under
-///                `#[serde(untagged)]` — the string form is the
-///                disambiguator.
+///   `"2026-05-13T14:30:00Z"`. UTC ONLY at the format boundary; timezone
+///   normalization is the caller's responsibility.
+/// - `Duration` → JSON string in humantime-like format: `"30d"`, `"48h"`,
+///   `"10m"`, `"5s"`, or combinations like `"1h30m"`. Stored internally as
+///   `chrono::Duration` (signed seconds-level). A JSON integer would collide
+///   with `Number(f64)` under `#[serde(untagged)]` — the string form is the
+///   disambiguator.
 ///
 /// Untagged-deserialization order is: `Boolean → Number → Money →
 /// DateTime → Date → Duration → String → List`. `Money` precedes

@@ -566,13 +566,16 @@ fn step2_files_sha256(
         .collect();
     let map_keys: BTreeSet<String> = map.keys().cloned().collect();
 
-    for missing in covered.difference(&map_keys) {
+    // Fail-fast: any single missing/extra key is enough to reject (a verifier
+    // needs one reason). `if let … .next()` states that intent directly — a
+    // `for` that always returns on the first item reads as an accident.
+    if let Some(missing) = covered.difference(&map_keys).next() {
         return Err(PackageVerifyError::FilesSha256(format!(
             "listed file `{missing}` has no entry in files_sha256 (the map, \
              when present, must cover every listed file except manifest.json)"
         )));
     }
-    for extra in map_keys.difference(&covered) {
+    if let Some(extra) = map_keys.difference(&covered).next() {
         return Err(PackageVerifyError::FilesSha256(format!(
             "files_sha256 has an entry for `{extra}`, which is not a listed \
              file (or is manifest.json, which cannot commit to its own bytes)"

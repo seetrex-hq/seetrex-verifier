@@ -8,7 +8,7 @@ name = "seetrex-verifier"
 # CLI binary (0.2.0 was library-only, so `cargo install` had nothing to
 # install — an external auditor could not obtain an executable tool from
 # public material).
-version = "0.3.2"
+version = "0.3.3"
 edition.workspace = true
 # Per-crate Apache-2.0 override — this crate is OPEN; the workspace
 # default stays PROPRIETARY and is NOT changed. Full text in ./LICENSE;
@@ -39,6 +39,16 @@ serde_json = { workspace = true }
 # pins it inline at 0.2); kept in lockstep with compliance/Cargo.toml.
 serde_jcs = "0.2"
 sha2 = { workspace = true }
+# Ed25519 signature verification for the cosigned-checkpoint half of the
+# anchor CONSISTENCIA line (`src/checkpoint.rs`). VERIFY-ONLY
+# (`VerifyingKey::verify_strict`) — this crate never signs. `default-features
+# = false` keeps out the signing/rng/std-heavy machinery; verification needs
+# none of it. A deliberate, signed decision: the standard, most-audited
+# Ed25519 library in Rust (the Sigsum ecosystem's own), the anchor path is the
+# product's core value, and it avoids a separate crate's release/version-sync
+# overhead. NOT a service dependency, so it does not break the crate-purity
+# guard (`test_intent_verifier_crate_dependency_purity`).
+ed25519-dalek = { version = "2", default-features = false }
 thiserror = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
