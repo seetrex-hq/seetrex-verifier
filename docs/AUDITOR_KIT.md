@@ -128,8 +128,9 @@ The executable has three subcommands — `verify-package <dir>
 [--expected-verdict-hash <hex>]` and `verify-chain <file.json>`, used in
 sections 3 and 4, and `verify-anchor <anchor.json> --kit <kit.json>
 [--monitor <bundle>]`, new in `0.3.3` and documented by its own `--help`
-output and the `CHANGELOG` (this kit does not yet include an anchor
-walkthrough). Running the tool with no or incomplete arguments prints usage
+output and the `CHANGELOG`; section 7 walks through what an auditor can and
+cannot run against `verify-anchor` today. Running the tool with no or
+incomplete arguments prints usage
 and exits with code `2` (verified; distinct from every verification outcome).
 
 ### 2.2 Route B — build from the signed tag on GitHub
@@ -297,7 +298,7 @@ language (Appendix A does exactly that and reproduces the same head).
   wrong — and the wording here is now the corrected one.
 
   Those four columns are not unprotected in the record itself: each is
-  committed inside its row's `verdict_hash` (preimage v2, section 7). But
+  committed inside its row's `verdict_hash` (preimage v2, spec section 7). But
   that binding is only recomputable from the verdict's **package**, which
   the chain export does not carry. So: treat the readable columns of an
   export as unverified metadata, and use `verify-package` on the package
@@ -443,6 +444,206 @@ Independence rule, restated once: obtain the key fingerprint, the chain
 export, and the expected verdict hashes through channels **you** choose and
 control. The package is never its own trust root, and neither is any single
 channel.
+
+---
+
+## 7. Anchor verification (`verify-anchor`): scope today, and a runnable demo
+
+`verify-anchor` is the `0.3.3` subcommand that checks a producer's published
+**anchor package** against a **pinned auditor kit** you supply — never
+trusting the package for the tenant identity, genesis key or witness policy —
+and reports two verdicts (its `--help` output is the authoritative wording):
+
+- **CONSISTENCIA** (non-contradiction): confirmed fully offline. Every
+  anchored leaf's inclusion proof and the checkpoint cosignatures ARE
+  cryptographically verified.
+- **COMPLETITUD** (nothing omitted): INCONCLUSIVE offline unless you supply
+  `--monitor <bundle.json>` from an independent monitor. Even then, the
+  monitor's enumeration completeness and recency are a TRUSTED input — the
+  leaves it reports are proven, the claim that it saw everything is not.
+
+### 7.1 What you cannot run yet (honest scope)
+
+As of 2026-07-27 there is **no live anchor walkthrough**, because two of the
+three inputs are not published:
+
+| input | status |
+|---|---|
+| `<anchor.json>` (anchor package) | **not published.** The producer pipeline submits anchor leaves to the transparency log but does not yet emit the anchor-package file |
+| `--kit <kit.json>` (pinned tenant slug, genesis key hash, log + witness public keys, quorum) | **values pinned in section 7.3 of this document** — compose the file yourself from that literal block; never fetch a kit from the host that serves the package |
+| `--monitor <bundle.json>` | **available today**: `https://trust.seetrex.com/witness-bundle.json` is emitted in the exact `seetrex/anchor-monitor/v1` format this flag consumes (top-level `version` field, verified live 2026-07-27). Note its `observations` and `consistency_proof` arrays are currently published empty, which bounds how far COMPLETITUD can get |
+
+When the anchor package is published, this section will be replaced by a
+live walkthrough with captures, like sections 3 and 4.
+
+### 7.2 What you can run today: the subcommand's own end-to-end suite
+
+The published crate ships an end-to-end suite that builds valid and invalid
+anchor packages with ephemeral keys and drives the **real installed-style
+binary** through every `verify-anchor` outcome — confirmed, tenant mismatch,
+malformed package (exit 1), malformed kit (exit 2), monitor-based COMPLETITUD
+both downgrading and confirming. From the crate tree (extract the `.crate`
+tarball from crates.io, or use the signed-tag checkout of section 2.2):
+
+```
+cargo test --test bin_e2e anchor
+```
+
+Literal output, captured 2026-07-27 against the crates.io `0.3.3` tree:
+
+```
+running 8 tests
+test verify_anchor_malformed_kit_exits_2 ... ok
+test test_scenario_verify_anchor_tenant_mismatch_fails ... ok
+test test_scenario_verify_anchor_confirmed_offline_no_reserved_token ... ok
+test verify_anchor_malformed_monitor_exits_2 ... ok
+test verify_anchor_missing_kit_is_usage_error ... ok
+test verify_anchor_malformed_package_exits_1 ... ok
+test verify_anchor_empty_honest_monitor_confirms_completitud ... ok
+test verify_anchor_real_monitor_completitud_downgrades ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.42s
+```
+
+(the 6 filtered-out tests cover the other two subcommands, the CLI's
+usage/version behaviour and the crate manifest; the monitor-based anchor
+tests use or derive their `--monitor` input from the crate's embedded
+`tests/fixtures/fb2c_enumeration_oracle.json`). Invoking the subcommand with missing arguments
+exits `2`, distinct from every verification outcome (re-verified 2026-07-27):
+
+```
+$ seetrex-verifier verify-anchor
+error: verify-anchor requires <anchor.json> and --kit <kit.json>
+$ echo $?
+2
+```
+
+### 7.3 Compose your `kit.json`: the pinned values
+
+The kit is the TRUSTED side of the boundary `verify-anchor` enforces: the
+tenant identity, the genesis key and the witness policy come from the kit you
+supply, never from the package being checked. That is worth exactly as much
+as the channel the values reach you by. The trusted channel for these values
+is **this document, in the GPG-signed source repository** (section 2.2 —
+verify the tag before trusting the tree). Deliberately, no `kit.json` file is
+served on `trust.seetrex.com`: the host that serves the untrusted
+`anchor.json` (and the monitor bundle) must never also be the source of the
+pins that judge them — a compromised webroot would then control both sides of
+the comparison. So: never fetch a kit from the same host that serves the
+package; compose the file yourself from the block below.
+
+<!-- kit-values:begin -->
+The template follows. The ONLY per-tenant field is `tenant_slug`. Two tenants
+are enrolled in the transparency log today: `seetrex-compliance` (the literal
+value in the block) and `seetrex-trust-center` — substitute the slug of the
+tenant you are auditing and leave every other value untouched.
+
+```json
+{
+  "version": "seetrex/anchor-kit/v1",
+  "tenant_slug": "seetrex-compliance",
+  "genesis_key_hash": "f50f20fa74c509ff4d1bd197851eb1489a197bd4076295ab40302d9d888101f5",
+  "policy": {
+    "log_pubkey": "0ec7e16843119b120377a73913ac6acbc2d03d82432e2c36b841b09a95841f25",
+    "witnesses": [
+      "b2106db9065ec97f25e09c18839216751a6e26d8ed8b41e485a563d3d1498536",
+      "15d6d0141543247b74bab3c1076372d9c894f619c376d64b29aa312cc00f61ad",
+      "076be8c9ee7ea60916f0df3608c945d7730082ecb37749dad2c9ed339fea770c"
+    ],
+    "quorum_k": 2
+  }
+}
+```
+<!-- kit-values:end -->
+
+These values are transcribed from the producer's pinned policy source, and
+the transcription is enforced rather than trusted: an intent test in the
+source tree extracts this literal block, parses it with the published crate's
+`parse_auditor_kit`, and compares it field by field against the production
+pins in code. A typo here is the one class of our error that would make
+verdicts STRONGER on your machine (e.g. `quorum_k` `2`→`1` yields a valid kit
+that silently weakens the cosignature quorum), so it fails CI instead of
+waiting for a human diff.
+
+**Provenance, value by value — and how to cross-check each one without us:**
+
+| Field | What it is | Independent cross-checks |
+|---|---|---|
+| `version` | the `seetrex/anchor-kit/v1` schema constant | the published `seetrex-verifier` `0.3.3` source (`anchor_package.rs`, `ANCHOR_KIT_VERSION`), on crates.io and under the signed tag |
+| `tenant_slug` | the tenant under audit (`seetrex-compliance` or `seetrex-trust-center` today) | the tenant's own chain-export name on the Trust Center (`<slug>-chain.json`) — a naming convention, not a security value |
+| `genesis_key_hash` | SHA-256 of the raw 32-byte Ed25519 GENESIS submit public key, generated on the producer host (2026-07-26); no rotation has occurred since (see 7.4c) | none outside the vendor — this is the producer's self-declared identity root, and pinning it IS the point: every anchored leaf must trace to it (via any published rotations) or CONSISTENCIA fails. Its only publication channel is this signed document |
+| `policy.log_pubkey` | the Ed25519 public key of the `seasalp.glasklar.is` Sigsum log | `https://www.sigsum.org/services/`; the Sigsum project's vetted policy `sigsum-generic-2025-1` (sigsum-go, `pkg/policy/builtin/`); Glasklar's own ops publication (`glasklar/services/sigsum-logs`, instance `seasalp.md`) |
+| `policy.witnesses[0]` | witness `witness.glasklar.is` | the vetted policy; the operator's own publication (`glasklar/services/witnessing`, `witness.glasklar.is/about.md`); sigsum.org/services |
+| `policy.witnesses[1]` | witness `witness.mullvad.net` | the vetted policy; the operator's own publication `https://witness.mullvad.net/about`; sigsum.org/services |
+| `policy.witnesses[2]` | witness `tillitis.se/tillitis-witness-1` | the vetted policy; the operator's own publication (`github.com/tillitis/tillitis.se-tillitis-witness-1`, `about.md`). Not yet listed on sigsum.org/services — the vetted policy postdates that page |
+| `policy.quorum_k` | `2` (of 3) | verbatim from the vetted policy's group rule (`group quorum-rule 2 …`) |
+
+The log and witness keys are published by their operators as base64 `vkey`
+lines; decode and compare the bytes, or diff against the vetted policy file
+directly. Each of those pins was cross-checked byte-for-byte against the
+operator's own publication when first pinned; make the same comparison
+yourself — the table exists so you never have to take this document's word
+for a key.
+
+The chain of custody for this section bottoms out where section 2.3 does: the
+release-signing fingerprint that authenticates the repository tags. Use the
+independent routes section 2.3 lists. A dedicated fingerprint page on
+`seetrex.com` — an origin distinct from both `github.com` and
+`trust.seetrex.com` — ships with the release that turns on the anchor
+surface, and will add one more independent route; until then, section 2.3's
+routes are the ones available.
+
+### 7.4 Reading the two verdicts: normative rules
+
+The rules below are **normative** for interpreting `verify-anchor` results
+against this producer's artifacts. They do not change what the tool computes;
+they state what a computed result does and does not mean.
+
+**(a) `observations` in the producer's bundle are SELF-REPORT — a COMPLETITUD
+built on them certifies self-attested liveness.** The consumer contract
+defines `observations` as the *auditor's own* liveness probes, and they are
+the single input that can absolve an anchored head whose export is not being
+served. The bundle published today carries `observations: []` (section 7.1);
+the release that turns on the anchor surface populates them — and it
+populates them **from the producer's own webroot directory**: `served: true`
+means "the tenant's export file was present and parsed on the producer's
+local filesystem at scan time". That is a filesystem read, not a probe of the
+served edge — it would remain `true` with the public edge entirely down.
+Therefore, at full force: a COMPLETITUD CONFIRMED whose `observations` come
+from the producer certifies liveness as SELF-ATTESTED — the producer emits
+`served: true` from its own local filesystem and is structurally incapable of
+emitting `false` for a tenant in its expected set; `served: true` is THE
+input that turns INCONCLUSIVE into CONFIRMED. For the strong verdict, replace
+or cross-check `observations` with YOUR OWN probe of the served edge before
+giving weight to the result. (CONSISTENCIA is unaffected: it never reads
+`observations`.)
+
+**(b) An empty `consistency_proof` is the CORRECT state; any tick skew is
+INCONCLUSIVE by construction.** The per-tenant packages and the monitor
+bundle are emitted in the same tick from the same cosigned checkpoint, so
+`package.checkpoint` equals the bundle's `c_audit` (same size, same root) and
+the freshness coupling passes with an empty proof — the rule's degenerate
+case "the reference checkpoint IS the package's checkpoint", not a missing
+proof. Both roots are authenticated independently (cosignatures verified on
+each side), so a skew in ANY direction — bundle ahead of the package or
+behind it — yields COMPLETITUD INCONCLUSIVE, never CONFIRMED. Practical
+consequence, benign by design (a time-of-check/time-of-use artifact of
+downloading two files): if your downloads straddled a publication, you can
+see COMPLETITUD INCONCLUSIVE with exit `0` on otherwise valid artifacts. That
+is not evidence of tampering — re-download BOTH artifacts and re-run.
+
+**(c) A CONSISTENCIA FAILED "leaf under a key not in the producer identity
+set" immediately after an ANNOUNCED key rotation may be a FALSE RED.**
+`rotations: []` is the current, correct state: no key rotation has occurred,
+so the identity set you derive from the pinned genesis is exactly that one
+key. If the producer announces a rotation, a package emitted before its
+packaging catches up with the rotation would still carry `rotations: []`, and
+leaves signed under the new key would then fail CONSISTENCIA with exactly the
+same message as a forgery. Immediately after an announced rotation,
+cross-check that FAILED against the producer's rotation announcement (and its
+rotation runbook) before concluding forgery: a mid-rotation packaging gap and
+tampering are distinguished by whether the announced rotation accounts for
+the new key. Absent any announced rotation, take the FAILED at face value.
 
 ---
 
