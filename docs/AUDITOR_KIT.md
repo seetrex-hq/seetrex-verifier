@@ -128,10 +128,10 @@ The executable has three subcommands — `verify-package <dir>
 [--expected-verdict-hash <hex>]` and `verify-chain <file.json>`, used in
 sections 3 and 4, and `verify-anchor <anchor.json> --kit <kit.json>
 [--monitor <bundle>]`, new in `0.3.3` and documented by its own `--help`
-output and the `CHANGELOG`; section 7 walks through what an auditor can and
-cannot run against `verify-anchor` today. Running the tool with no or
-incomplete arguments prints usage
-and exits with code `2` (verified; distinct from every verification outcome).
+output and the `CHANGELOG`; section 7 walks through the live
+`verify-anchor` run against the published anchor packages. Running the
+tool with no or incomplete arguments prints usage and exits with code `2`
+(verified; distinct from every verification outcome).
 
 ### 2.2 Route B — build from the signed tag on GitHub
 
@@ -225,7 +225,10 @@ Cross-check it through independent channels and require them to agree:
 1. **This document** — the fingerprint printed above.
 2. **The vendor's domain, over TLS** —
    `https://seetrex.com/.well-known/release-signing-pubkey.asc` (the full
-   public key; run `gpg --show-keys --fingerprint` on it).
+   public key; run `gpg --show-keys --fingerprint` on it), and the human
+   page `https://seetrex.com/signing-key`, which prints the same
+   fingerprint. Both come from the one domain, so together they still
+   count as ONE channel.
 3. **The public repository** — `keys/release-signing-pubkey.asc` in the
    repository tree. Note the honest caveat: this copy is attested by tags
    signed with the very key it contains, so it is a consistency cross-check
@@ -462,21 +465,85 @@ and reports two verdicts (its `--help` output is the authoritative wording):
   monitor's enumeration completeness and recency are a TRUSTED input — the
   leaves it reports are proven, the claim that it saw everything is not.
 
-### 7.1 What you cannot run yet (honest scope)
+### 7.1 Live walkthrough: verify the published anchor packages
 
-As of 2026-07-27 there is **no live anchor walkthrough**, because two of the
-three inputs are not published:
+Since witness `0.3.0` went live (2026-07-28) all three inputs are published,
+and this walkthrough needs nothing but public artifacts — no host access,
+reproduce it yourself: the verifier installed from crates.io and the kit
+composed from the literal block in 7.3 of the **published, tag-signed** copy
+of this document — never fetched from the host that serves the packages.
 
-| input | status |
-|---|---|
-| `<anchor.json>` (anchor package) | **not published.** The producer pipeline submits anchor leaves to the transparency log but does not yet emit the anchor-package file |
-| `--kit <kit.json>` (pinned tenant slug, genesis key hash, log + witness public keys, quorum) | **values pinned in section 7.3 of this document** — compose the file yourself from that literal block; never fetch a kit from the host that serves the package |
-| `--monitor <bundle.json>` | **available today**: `https://trust.seetrex.com/witness-bundle.json` is emitted in the exact `seetrex/anchor-monitor/v1` format this flag consumes (top-level `version` field, verified live 2026-07-27). Note its `observations` and `consistency_proof` arrays are currently published empty, which bounds how far COMPLETITUD can get |
+```
+$ seetrex-verifier --version
+seetrex-verifier 0.3.3
 
-When the anchor package is published, this section will be replaced by a
-live walkthrough with captures, like sections 3 and 4.
+$ curl -sO https://trust.seetrex.com/seetrex-compliance-anchor.json
+$ curl -sO https://trust.seetrex.com/seetrex-trust-center-anchor.json
+$ curl -sO https://trust.seetrex.com/witness-bundle.json
+```
 
-### 7.2 What you can run today: the subcommand's own end-to-end suite
+Compose `kit.json` per tenant from section 7.3 (`tenant_slug` is the only
+field that changes), then run one verification per tenant:
+
+```
+$ seetrex-verifier verify-anchor seetrex-compliance-anchor.json --kit kit-compliance.json --monitor witness-bundle.json
+Anchor package CONSISTENCIA CONFIRMED OFFLINE
+  tenant:                  "seetrex-compliance"
+  anchored leaves checked: 22
+  rotations checked:       0
+  identity keys:           1 (genesis + accepted rotations)
+  COMPLETITUD:             CONFIRMED OFFLINE (monitor supplied; enumeration completeness = trusted input)
+$ echo $?
+0
+
+$ seetrex-verifier verify-anchor seetrex-trust-center-anchor.json --kit kit-trust-center.json --monitor witness-bundle.json
+Anchor package CONSISTENCIA CONFIRMED OFFLINE
+  tenant:                  "seetrex-trust-center"
+  anchored leaves checked: 2
+  rotations checked:       0
+  identity keys:           1 (genesis + accepted rotations)
+  COMPLETITUD:             CONFIRMED OFFLINE (monitor supplied; enumeration completeness = trusted input)
+$ echo $?
+0
+```
+
+The first run's explanatory footer (byte-identical in the second run and
+elided there) states the boundary this walkthrough must not blur:
+
+```
+CONSISTENCIA (offline) confirms only that the PRESENTED material does not contradict itself: every anchored leaf's inclusion under the cosigned checkpoint verifies, the producer identity chain derives from the PINNED genesis without a fork, and the chain JOIN holds. It does NOT prove COMPLETITUD: a vendor who OMITS a contradictory log leaf republishes a shorter, self-consistent history that still passes CONSISTENCIA — catching omission needs an INDEPENDENT monitor enumeration of the log. That second verdict, COMPLETITUD, is INCONCLUSIVE unless you supply such an enumeration (--monitor <bundle>); with one it becomes a REAL verdict (CONFIRMED / INCONCLUSIVE / FAILED) shown on the COMPLETITUD line above, and WITHOUT one a confirmed CONSISTENCIA is NOT a statement that the vendor anchored everything. A confirmed verdict over ZERO anchored leaves is VACUOUS — it asserts nothing about anchoring; read the 'anchored leaves checked' count. Surfaced anomalous rotations (e.g. unauthorized) do NOT lower CONSISTENCIA — their fatal mapping is enumeration-dependent (COMPLETITUD); investigate them separately. The witness policy and genesis key used here are PINNED inputs from your auditor kit, never from the package.
+```
+
+Read that footer against what this walkthrough actually fed it:
+`witness-bundle.json` is the producer's OWN enumeration, downloaded from the
+producer's own host — not an independent monitor. This COMPLETITUD CONFIRMED
+is therefore self-attested in BOTH legs (the enumeration and, per 7.4(a),
+the liveness observations). The strong, omission-ruling-out verdict needs an
+enumeration that you or a third party ran under the pinned policy.
+
+The strong reading of those COMPLETITUD lines is governed by 7.4: the
+bundle's `observations` are the producer's SELF-REPORT, so finish with your
+own probe of the same URLs and compare:
+
+```
+$ python -c "import json; print(json.load(open('witness-bundle.json'))['observations'])"
+[{'served': True, 'slug': 'seetrex-compliance'}, {'served': True, 'slug': 'seetrex-trust-center'}]
+$ curl -s -o /dev/null -w "%{http_code}" https://trust.seetrex.com/seetrex-compliance-anchor.json
+200
+$ curl -s -o /dev/null -w "%{http_code}" https://trust.seetrex.com/seetrex-trust-center-anchor.json
+200
+```
+
+The own probe agrees with the self-report. If your two downloads straddle a
+producer tick, COMPLETITUD can come back INCONCLUSIVE from checkpoint skew —
+that is the expected TOCTOU reading per 7.4(b): re-download BOTH files and
+re-run. The witness ticks once a day and the pipeline republishes hourly, so
+a fresh round almost never straddles a tick; if 2-3 fresh rounds still
+return INCONCLUSIVE, it is not skew — stop and investigate. Note the exit
+code stays `0` on an INCONCLUSIVE: a scripted gate must read the COMPLETITUD
+line, not just the exit status.
+
+### 7.2 The subcommand's own end-to-end suite, runnable without any download
 
 The published crate ships an end-to-end suite that builds valid and invalid
 anchor packages with ephemeral keys and drives the **real installed-style
@@ -588,10 +655,9 @@ for a key.
 The chain of custody for this section bottoms out where section 2.3 does: the
 release-signing fingerprint that authenticates the repository tags. Use the
 independent routes section 2.3 lists. A dedicated fingerprint page on
-`seetrex.com` — an origin distinct from both `github.com` and
-`trust.seetrex.com` — ships with the release that turns on the anchor
-surface, and will add one more independent route; until then, section 2.3's
-routes are the ones available.
+`seetrex.com` (`/signing-key`) shipped with the anchor-surface release;
+being on the same domain as the `.well-known` copy it is a second surface
+of route (2) in section 2.3, not an additional independent channel.
 
 ### 7.4 Reading the two verdicts: normative rules
 
@@ -603,9 +669,9 @@ they state what a computed result does and does not mean.
 built on them certifies self-attested liveness.** The consumer contract
 defines `observations` as the *auditor's own* liveness probes, and they are
 the single input that can absolve an anchored head whose export is not being
-served. The bundle published today carries `observations: []` (section 7.1);
-the release that turns on the anchor surface populates them — and it
-populates them **from the producer's own webroot directory**: `served: true`
+served. Since witness `0.3.0` (2026-07-28) the published bundle carries one
+observation per tenant of the expected set (section 7.1) — populated
+**from the producer's own webroot directory**: `served: true`
 means "the tenant's export file was present and parsed on the producer's
 local filesystem at scan time". That is a filesystem read, not a probe of the
 served edge — it would remain `true` with the public edge entirely down.
