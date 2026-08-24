@@ -49,11 +49,13 @@ cargo test --locked
 
 ## Getting the verification tool
 
-`seetrex-verifier` (0.3.0 and later) ships an installable command-line
-binary of the same name:
+`seetrex-verifier` has shipped an installable command-line binary of the
+same name since 0.3.0. Install the current version, `0.3.3`: the `0.3.0`
+and `0.3.1` binaries printed a `verify-chain` trailer that overstated the
+scope of that check, and must not be used as the executable.
 
 ```bash
-cargo install seetrex-verifier
+cargo install seetrex-verifier --locked --version 0.3.3
 
 seetrex-verifier verify-package <dir> [--expected-verdict-hash <hex>]
 seetrex-verifier verify-chain <chain-export.json>

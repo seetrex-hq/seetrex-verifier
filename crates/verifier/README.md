@@ -20,11 +20,13 @@ consumes this crate and adds the inference engine on top):
 
 ## Command-line tool
 
-Since 0.3.0 the crate ships an installable binary of the same name
-(0.2.0 was library-only):
+The crate has shipped an installable binary of the same name since 0.3.0
+(0.2.0 was library-only). Install the current version, `0.3.3`: the `0.3.0`
+and `0.3.1` binaries printed a `verify-chain` trailer that overstated the
+scope of that check, and must not be used as the executable.
 
 ```console
-cargo install seetrex-verifier
+cargo install seetrex-verifier --locked --version 0.3.3
 
 seetrex-verifier verify-package <dir> [--expected-verdict-hash <hex>]
 seetrex-verifier verify-chain <chain-export.json>

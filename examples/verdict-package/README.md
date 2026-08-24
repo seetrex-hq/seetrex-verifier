@@ -39,7 +39,7 @@ Install the verifier first (see the repository README or
 [`docs/AUDITOR_KIT.md`](../../docs/AUDITOR_KIT.md)):
 
 ```
-$ cargo install seetrex-verifier --locked --version 0.3.1
+$ cargo install seetrex-verifier --locked --version 0.3.3
 ```
 
 **Without an external anchor** — internal consistency only:
@@ -62,9 +62,9 @@ Public chain package VERIFIED OFFLINE
   verdict_count:   1
   last_chain_hash: ee6879123d5b8b67267e740ca93bfba1d543892177604b9742791b84bebf5a3e
 
-Compare these two values against the vendor's public Trust Center page for this tenant — a match proves the LINKS of the observed history are intact: no row was inserted, removed or reordered, and no hash column was altered, without breaking a link.
+Compare these two values against the vendor's public Trust Center page for this tenant. A match proves this file agrees with what the vendor publishes RIGHT NOW — nothing more. It does NOT prove rows were not removed: a vendor who republishes a truncated chain also republishes its shorter head, so both sides of this comparison move together. What catches removal is material you kept earlier — a copy of this export, or a verdict package whose verdict_hash (recompute it with `verify-package`) still appears in a row of the published chain. Each export you fetch should extend the prefix you already hold, not rewrite it; keeping and comparing that material is your step. This tool has no command for either comparison; you must keep the material and make it yourself.
 
-NOT covered by this check: the human-readable columns of each row (verdict_outcome, ruleset_id, appended_at, verdict_id). They are not inputs to the chain link, so altering them keeps every link — and the hash above — valid. Each is committed inside its own verdict_hash, which you can only recompute from that verdict's package (`verify-package`). Treat these columns as unverified metadata until you do.
+NOT covered by this check: the human-readable columns of each row (verdict_outcome, ruleset_id, appended_at, verdict_id). They are not inputs to the chain link, so altering them keeps every link — and the hash above — valid. Two of them — verdict_outcome and ruleset_id — are committed inside that row's verdict_hash, recomputable only from that verdict's package (`verify-package`). The other two — appended_at and verdict_id — are committed NOWHERE: they are inputs neither to the chain link nor to verdict_hash, and no artifact we publish binds them. Treat all four as unverified metadata; the last two you cannot verify at all.
 
 $ seetrex-verifier verify-package examples/verdict-package/package \
     --expected-verdict-hash 93bcd10fd82ae721c478130b35c2c2c9030cbe2dec02e0c495254f7cbee1af69

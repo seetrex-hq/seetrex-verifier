@@ -637,7 +637,7 @@ ordinals are contiguous from 1. The resulting head (`verdict_count`,
 `last_chain_hash`) can then be compared against the published tenant page.
 
 The export is obtained from the vendor's public Trust Center — for example
-(non-normative) the tenant's page under `https://seetrex.com/trust/` — over a
+(non-normative) the tenant's page under `https://trust.seetrex.com/` — over a
 channel the auditor chooses and controls; §9.3 governs its role as the
 external anchor source.
 

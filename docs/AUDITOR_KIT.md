@@ -1,5 +1,18 @@
 # Seetrex Compliance — Auditor Kit
 
+<!-- doc-revision:begin -->
+**Document revision: `2026-08-24-genesis-reset`.** If your copy lacks this
+line it predates the genesis reset of 2026-08-24 (section 7.3) and its kit
+pins a RETIRED identity. The current copy is the one under the NEWEST signed
+tag of the public verifier repository named in section 2.2 whose date is on
+or after 2026-08-24 — a tag dated earlier (such as `seetrex-verifier-v0.3.3`,
+2026-07-27) carries the retired revision. The presence of this line does not
+by itself prove the copy is the current one — a later revision would carry a
+later id, and only the DATE of the signed tag your copy came from decides.
+Re-obtain it before drawing any conclusion from an identity FAILED
+(section 7.4c/d).
+<!-- doc-revision:end -->
+
 This document is for an external technical auditor with no prior knowledge of
 Seetrex. It explains what a Seetrex Compliance verdict is, which of its
 properties you can verify **independently, offline, with open tooling**, how
@@ -142,6 +155,20 @@ the tag before trusting the tree.
 The current release is `0.3.3`; the walkthrough below verifies its signed tag
 `seetrex-verifier-v0.3.3`.
 
+<!-- verifier-tag-era:begin -->
+**Tool release and document revision are two different things.** `0.3.3` (tag
+dated 2026-07-27) is the current release of the VERIFIER: the executable did
+not change with the genesis reset of 2026-08-24, and every check in this kit
+runs on it. The copy of THIS DOCUMENT carried by that tag is a different
+matter — it is the RETIRED revision, and its section 7.3 pins the retired
+genesis key. For the document, use the tag that publishes this revision: the
+newest signed tag of this repository dated on or after 2026-08-24. This
+revision cannot name that tag — a tag is created when the revision it carries
+is published — so select it by DATE, not by version number, and confirm
+against the revision line at the top of this document. Everything below in
+this section is about obtaining the TOOL.
+<!-- verifier-tag-era:end -->
+
 ```
 # 1. Fetch the release-signing public key (see 2.3 for out-of-band pinning)
 curl -fsSL -o seetrex-release-key.asc \
@@ -250,13 +277,36 @@ Every verdict appends one row to an append-only hash chain; the chain is
 published as a JSON export on the vendor's Trust Center:
 
 ```
-curl -fsSL -o chain.json https://seetrex.com/trust/seetrex-compliance-chain.json
+curl -fsSL -o chain.json https://trust.seetrex.com/seetrex-compliance-chain.json
 seetrex-verifier verify-chain chain.json
 ```
 
-Real output against the live public chain, captured 2026-07-27 with `0.3.3`
-(the chain grows continuously — your row count and head hash will be at least
-these):
+Output shape, with the values of a chain captured 2026-07-27 with `0.3.3`:
+
+<!-- section3-discontinuity:begin -->
+> **Discontinuity notice (2026-08-24).** The chain captured below belongs to the
+> RETIRED identity: on 2026-08-24 the producer wiped every chain row and
+> restarted `seetrex-compliance` at ordinal 1 under a new genesis key (section
+> 7.3). The `verdict_count` below is therefore NOT a floor for the live chain —
+> a fresh export shows a small count that grows from 1. Any export or package
+> you kept from before 2026-08-24 will not join the live chain, and the "extend
+> the prefix" rule in the footer applies only to material captured after that
+> date.
+>
+> **That loss is permanent, and it is the anti-omission check itself that is
+> lost for the retired era.** No pre-reset export can ever extend the live
+> chain's prefix, so a pre-reset export that fails to extend it — the exact
+> signature this section teaches you to read as truncation — is now also the
+> expected consequence of the reset, and no artifact this kit publishes tells
+> the two apart for material captured before 2026-08-24. Nothing replaces it
+> for that era. What survives of the retired era is on the transparency log,
+> not in the chain: the leaves anchored under the retired genesis stay in
+> `seasalp.glasklar.is` forever, explained by no published chain (section 7.3,
+> the discontinuity note next to the kit template), and section 7.4(d) states
+> exactly what a monitor enumeration that still carries them can and cannot
+> say. For material captured on or after 2026-08-24 the rule below works
+> unchanged.
+<!-- section3-discontinuity:end -->
 
 ```
 Public chain package VERIFIED OFFLINE
@@ -308,7 +358,7 @@ language (Appendix A does exactly that and reproduces the same head).
   behind a row before you rely on the outcome it displays.
 - `verdict_count` / `last_chain_hash`: the recomputed head. To bind the
   export to what the vendor currently publishes, compare both values against
-  the Trust Center page (`https://seetrex.com/trust/`) — a channel you fetch
+  the Trust Center page (`https://trust.seetrex.com/`) — a channel you fetch
   yourself. The tool's own trailer says exactly this; the export alone does
   not prove freshness.
 - Any `ERROR: ...` line + exit `1`: the named row fails the named check; the
@@ -439,7 +489,7 @@ source rebuild under NDA for regulators. To arrange either, contact
 | `seetrex-format` `1.0.0` | crates.io | crates.io versions are immutable; pin with the exact requirement `=1.0.0` |
 | `seetrex-verifier` `0.3.3` | crates.io | immutable; install with `cargo install seetrex-verifier --locked --version 0.3.3` (ships the executable), or pin `=0.3.3` as a library dependency (itself pins `seetrex-format =1.0.0`). `0.3.2` remains valid for every check in this kit (`0.3.3` is additive: it only adds `verify-anchor`). `0.3.0` and `0.3.1` stay downloadable forever and must not be used **as the executable**: their `verify-chain` trailers overstated the check's coverage (section 3). As a library they compute every hash and result identically, but their printed chain-scope wording (and two doc comments) carry the same overclaim `0.3.2` corrected — see appendix A |
 | Package format spec | `docs/SPEC_VERDICT_PACKAGE_V1.md` in the source repository | covered by the signed tag; the normative reference for every check in this kit |
-| Public chain export | `https://seetrex.com/trust/seetrex-compliance-chain.json` | self-verifying offline (section 3); head comparable against the Trust Center page (`verdict_count`, `last_chain_hash`), fetched over a channel you control |
+| Public chain export | `https://trust.seetrex.com/seetrex-compliance-chain.json` | self-verifying offline (section 3); head comparable against the Trust Center page (`verdict_count`, `last_chain_hash`), fetched over a channel you control |
 | Build toolchain | `rust-toolchain.toml` (channel `1.91.1`) + committed `Cargo.lock` in the source repository | build and test with `--locked` from the signed tag |
 | Verification code paths | the published crates | the shipped executable is a thin shell over the same library code the vendor's own CLI runs (not a reimplementation); its dependency purity — no engine, no network, no database — is enforced by intent tests inside the crate itself |
 
@@ -465,7 +515,7 @@ and reports two verdicts (its `--help` output is the authoritative wording):
   monitor's enumeration completeness and recency are a TRUSTED input — the
   leaves it reports are proven, the claim that it saw everything is not.
 
-### 7.1 Live walkthrough: verify the published anchor packages
+### 7.1 Walkthrough (illustrative transcript): verify the published anchor packages
 
 Since witness `0.3.0` went live (2026-07-28) all three inputs are published,
 and this walkthrough needs nothing but public artifacts — no host access,
@@ -478,27 +528,19 @@ $ seetrex-verifier --version
 seetrex-verifier 0.3.3
 
 $ curl -sO https://trust.seetrex.com/seetrex-compliance-anchor.json
-$ curl -sO https://trust.seetrex.com/seetrex-trust-center-anchor.json
 $ curl -sO https://trust.seetrex.com/witness-bundle.json
 ```
 
-Compose `kit.json` per tenant from section 7.3 (`tenant_slug` is the only
-field that changes), then run one verification per tenant:
+Compose `kit.json` from section 7.3 (`tenant_slug` is the only field that
+changes if more tenants enroll), then run the verification. The transcript
+below is ILLUSTRATIVE, not a re-captured run: its `anchored leaves checked`
+is what a chain freshly reset on 2026-08-24 shows (the ENROLL leaf plus head
+ordinal 1) and grows by one with every anchored head:
 
 ```
-$ seetrex-verifier verify-anchor seetrex-compliance-anchor.json --kit kit-compliance.json --monitor witness-bundle.json
+$ seetrex-verifier verify-anchor seetrex-compliance-anchor.json --kit kit.json --monitor witness-bundle.json
 Anchor package CONSISTENCIA CONFIRMED OFFLINE
   tenant:                  "seetrex-compliance"
-  anchored leaves checked: 22
-  rotations checked:       0
-  identity keys:           1 (genesis + accepted rotations)
-  COMPLETITUD:             CONFIRMED OFFLINE (monitor supplied; enumeration completeness = trusted input)
-$ echo $?
-0
-
-$ seetrex-verifier verify-anchor seetrex-trust-center-anchor.json --kit kit-trust-center.json --monitor witness-bundle.json
-Anchor package CONSISTENCIA CONFIRMED OFFLINE
-  tenant:                  "seetrex-trust-center"
   anchored leaves checked: 2
   rotations checked:       0
   identity keys:           1 (genesis + accepted rotations)
@@ -507,8 +549,8 @@ $ echo $?
 0
 ```
 
-The first run's explanatory footer (byte-identical in the second run and
-elided there) states the boundary this walkthrough must not blur:
+The run's explanatory footer states the boundary this walkthrough must not
+blur:
 
 ```
 CONSISTENCIA (offline) confirms only that the PRESENTED material does not contradict itself: every anchored leaf's inclusion under the cosigned checkpoint verifies, the producer identity chain derives from the PINNED genesis without a fork, and the chain JOIN holds. It does NOT prove COMPLETITUD: a vendor who OMITS a contradictory log leaf republishes a shorter, self-consistent history that still passes CONSISTENCIA — catching omission needs an INDEPENDENT monitor enumeration of the log. That second verdict, COMPLETITUD, is INCONCLUSIVE unless you supply such an enumeration (--monitor <bundle>); with one it becomes a REAL verdict (CONFIRMED / INCONCLUSIVE / FAILED) shown on the COMPLETITUD line above, and WITHOUT one a confirmed CONSISTENCIA is NOT a statement that the vendor anchored everything. A confirmed verdict over ZERO anchored leaves is VACUOUS — it asserts nothing about anchoring; read the 'anchored leaves checked' count. Surfaced anomalous rotations (e.g. unauthorized) do NOT lower CONSISTENCIA — their fatal mapping is enumeration-dependent (COMPLETITUD); investigate them separately. The witness policy and genesis key used here are PINNED inputs from your auditor kit, never from the package.
@@ -521,18 +563,18 @@ is therefore self-attested in BOTH legs (the enumeration and, per 7.4(a),
 the liveness observations). The strong, omission-ruling-out verdict needs an
 enumeration that you or a third party ran under the pinned policy.
 
+<!-- self-report-probe:begin -->
 The strong reading of those COMPLETITUD lines is governed by 7.4: the
 bundle's `observations` are the producer's SELF-REPORT, so finish with your
 own probe of the same URLs and compare:
 
 ```
 $ python -c "import json; print(json.load(open('witness-bundle.json'))['observations'])"
-[{'served': True, 'slug': 'seetrex-compliance'}, {'served': True, 'slug': 'seetrex-trust-center'}]
+[{'served': True, 'slug': 'seetrex-compliance'}]
 $ curl -s -o /dev/null -w "%{http_code}" https://trust.seetrex.com/seetrex-compliance-anchor.json
 200
-$ curl -s -o /dev/null -w "%{http_code}" https://trust.seetrex.com/seetrex-trust-center-anchor.json
-200
 ```
+<!-- self-report-probe:end -->
 
 The own probe agrees with the self-report. If your two downloads straddle a
 producer tick, COMPLETITUD can come back INCONCLUSIVE from checkpoint skew —
@@ -599,17 +641,29 @@ pins that judge them — a compromised webroot would then control both sides of
 the comparison. So: never fetch a kit from the same host that serves the
 package; compose the file yourself from the block below.
 
+<!-- kit-channel-era:begin -->
+**Which signed copy — the era matters more than the version.** The values
+below are the LIVE ones only in a copy of this document published on or after
+the genesis reset of 2026-08-24. Take them from the tag that publishes this
+revision — the newest signed tag of the repository in section 2.2 whose date
+is on or after 2026-08-24 (section 2.2 explains why no version number can
+name it). The tag `seetrex-verifier-v0.3.3` (2026-07-27) is still the current
+release of the TOOL, and nothing about the reset changed the executable; but
+the copy of this document under it pins the RETIRED genesis key, and a kit
+composed from it fails every live leaf (sections 7.4c and 7.4d).
+<!-- kit-channel-era:end -->
+
 <!-- kit-values:begin -->
-The template follows. The ONLY per-tenant field is `tenant_slug`. Two tenants
-are enrolled in the transparency log today: `seetrex-compliance` (the literal
-value in the block) and `seetrex-trust-center` — substitute the slug of the
-tenant you are auditing and leave every other value untouched.
+The template follows. The ONLY per-tenant field is `tenant_slug`. One tenant
+is enrolled in the transparency log today: `seetrex-compliance` (the literal
+value in the block) — substitute the slug of the tenant you are auditing and
+leave every other value untouched.
 
 ```json
 {
   "version": "seetrex/anchor-kit/v1",
   "tenant_slug": "seetrex-compliance",
-  "genesis_key_hash": "f50f20fa74c509ff4d1bd197851eb1489a197bd4076295ab40302d9d888101f5",
+  "genesis_key_hash": "85b052121ca91072fecc37279ff503588e4f034ea1fd6405e0a59cbcbb2fc406",
   "policy": {
     "log_pubkey": "0ec7e16843119b120377a73913ac6acbc2d03d82432e2c36b841b09a95841f25",
     "witnesses": [
@@ -622,6 +676,25 @@ tenant you are auditing and leave every other value untouched.
 }
 ```
 <!-- kit-values:end -->
+
+<!-- identity-discontinuity:begin -->
+**Genesis reset of 2026-08-24 (a discontinuity, not a rotation).** Before that
+date the production anchor identity was the genesis key
+`f50f20fa74c509ff4d1bd197851eb1489a197bd4076295ab40302d9d888101f5` (cut over
+2026-07-26). On 2026-08-24 every test tenant, verdict and chain row was wiped
+from production and a NEW genesis key was generated on the host:
+`85b052121ca91072fecc37279ff503588e4f034ea1fd6405e0a59cbcbb2fc406`, the
+value in the template above. There is NO `rotate` leaf joining the two
+identities: the leaves anchored under the old key remain in
+`seasalp.glasklar.is` forever, are explained by no published chain, and are
+not part of the identity this kit pins. An auditor holding a chain export or
+anchor package from before 2026-08-24 is looking at the retired identity — do
+not expect it to join the live chain. The slug `seetrex-compliance` was
+re-enrolled under the new key, so its chain restarts at ordinal 1.
+<!-- identity-discontinuity:end -->
+<!-- (the region above is pinned by an intent test in the producer's source
+      tree: both key hashes, the "no rotate leaf" statement and the reset date
+      must stay.) -->
 
 These values are transcribed from the producer's pinned policy source, and
 the transcription is enforced rather than trusted: an intent test in the
@@ -637,8 +710,8 @@ waiting for a human diff.
 | Field | What it is | Independent cross-checks |
 |---|---|---|
 | `version` | the `seetrex/anchor-kit/v1` schema constant | the published `seetrex-verifier` `0.3.3` source (`anchor_package.rs`, `ANCHOR_KIT_VERSION`), on crates.io and under the signed tag |
-| `tenant_slug` | the tenant under audit (`seetrex-compliance` or `seetrex-trust-center` today) | the tenant's own chain-export name on the Trust Center (`<slug>-chain.json`) — a naming convention, not a security value |
-| `genesis_key_hash` | SHA-256 of the raw 32-byte Ed25519 GENESIS submit public key, generated on the producer host (2026-07-26); no rotation has occurred since (see 7.4c) | none outside the vendor — this is the producer's self-declared identity root, and pinning it IS the point: every anchored leaf must trace to it (via any published rotations) or CONSISTENCIA fails. Its only publication channel is this signed document |
+| `tenant_slug` | the tenant under audit (`seetrex-compliance` today — the only enrolled tenant since the 2026-08-24 reset) | the tenant's own chain-export name on the Trust Center (`<slug>-chain.json`) — a naming convention, not a security value |
+| `genesis_key_hash` | SHA-256 of the raw 32-byte Ed25519 GENESIS submit public key, generated on the producer host on 2026-08-24 (the genesis reset — it REPLACED the 2026-07-26 key, see the discontinuity note above); no rotation has occurred since (see 7.4c) | none outside the vendor — this is the producer's self-declared identity root, and pinning it IS the point: every anchored leaf must trace to it (via any published rotations) or CONSISTENCIA fails. Its only publication channel is this signed document |
 | `policy.log_pubkey` | the Ed25519 public key of the `seasalp.glasklar.is` Sigsum log | `https://www.sigsum.org/services/`; the Sigsum project's vetted policy `sigsum-generic-2025-1` (sigsum-go, `pkg/policy/builtin/`); Glasklar's own ops publication (`glasklar/services/sigsum-logs`, instance `seasalp.md`) |
 | `policy.witnesses[0]` | witness `witness.glasklar.is` | the vetted policy; the operator's own publication (`glasklar/services/witnessing`, `witness.glasklar.is/about.md`); sigsum.org/services |
 | `policy.witnesses[1]` | witness `witness.mullvad.net` | the vetted policy; the operator's own publication `https://witness.mullvad.net/about`; sigsum.org/services |
@@ -698,8 +771,9 @@ downloading two files): if your downloads straddled a publication, you can
 see COMPLETITUD INCONCLUSIVE with exit `0` on otherwise valid artifacts. That
 is not evidence of tampering — re-download BOTH artifacts and re-run.
 
-**(c) A CONSISTENCIA FAILED "leaf under a key not in the producer identity
-set" immediately after an ANNOUNCED key rotation may be a FALSE RED.**
+**(c) A CONSISTENCIA FAILED "leaf submitter key is not in the pinned producer
+identity set — inclusion in the shared log does not make the leaf ours"
+immediately after an ANNOUNCED key rotation may be a FALSE RED.**
 `rotations: []` is the current, correct state: no key rotation has occurred,
 so the identity set you derive from the pinned genesis is exactly that one
 key. If the producer announces a rotation, a package emitted before its
@@ -709,7 +783,104 @@ same message as a forgery. Immediately after an announced rotation,
 cross-check that FAILED against the producer's rotation announcement (and its
 rotation runbook) before concluding forgery: a mid-rotation packaging gap and
 tampering are distinguished by whether the announced rotation accounts for
-the new key. Absent any announced rotation, take the FAILED at face value.
+the new key.
+<!-- stale-kit-rule:begin -->
+Absent any announced rotation, do NOT take the FAILED at face value yet: the
+same FAILED is produced whenever kit and material come from different sides
+of the genesis RESET of 2026-08-24 (section 7.3 — not a rotation, no `rotate`
+leaf). The two cases are symmetric: (1) a kit composed from a copy of this
+document signed BEFORE 2026-08-24 pins the RETIRED genesis (`f50f20fa…01f5`)
+and fails every live leaf, which is signed under `85b05212…c406`; (2) an
+anchor package you saved BEFORE 2026-08-24 carries leaves under the retired
+genesis and fails under the current kit — and re-composing the kit does not
+change that. **The rule: pair kit and material from the same era.** A FAILED
+from a CROSS-era pair (kit from one side of 2026-08-24, material from the
+other) is the discontinuity, benign by design, and proves nothing either
+way. A FAILED from a SAME-era pair is a real finding within that era; the one
+that is evidence of forgery against the LIVE identity is a FAILED obtained
+with the kit of the current tag-signed copy of 7.3 AND material fetched after
+2026-08-24. Re-compose the kit from the current tag-signed copy, re-fetch the
+material, re-run — and confirm first that your copy of this document is the
+current one (revision line at the top).
+<!-- stale-kit-rule:end -->
+
+<!-- completitud-reset-rule:begin -->
+**(d) A COMPLETITUD FAILED "enumerated leaf under a key not in the producer
+identity set — a key without an authorized rotate (G-v6-7)" whose only alien
+key is the genesis of the OTHER side of the reset is the same discontinuity,
+not an unauthorized rotation.**
+
+This verdict exists only when you pass `--monitor`: with no bundle supplied
+COMPLETITUD is INCONCLUSIVE (section 7) and nothing below applies.
+
+The log keeps the leaves anchored under `f50f20fa…01f5` forever. A monitor
+enumeration that carries leaves of the retired era — a bundle produced before
+2026-08-24, or one whose submitter filter spans the reset because it
+deliberately keeps the retired key "for history" — retains those leaves, and
+against a kit+package of the live era — the identity set is the one your KIT
+derives from the live genesis `85b05212…c406` — the verifier
+reports exactly that G-v6-7 FAILED: the retired key has no `rotate` leaf
+authorizing it, because it was never rotated — it was replaced.
+
+**The rule is symmetric, exactly as in 7.4(c).** This gate compares the
+bundle's leaves against the identity set your KIT derives, so the mirror image
+yields the identical FAILED: a kit and a package of the RETIRED era, checked
+against a bundle of the LIVE era, make `85b05212…c406` the alien key — and
+that is the pair an auditor is most likely to assemble by accident, because
+the bundle the producer publishes today carries live-era leaves only (its scan
+filters by the live genesis) while a copy of this document signed before
+2026-08-24 still yields a retired-era kit. Neither direction is evidence
+against anyone. **Forgery is asserted only when kit, package AND bundle are
+all of the same era**; a pair drawn from different sides of 2026-08-24 is
+the discontinuity when its only alien key is the genesis of the other era,
+and the era of a bundle is read from its keys with the command below.
+
+**The message does not name the offending key.** It is a fixed literal,
+byte-identical for every alien key, so there is nothing in it to read. Read
+the keys from the bundle instead: every entry of its `leaves` array carries
+`submitter_key_hash` as lowercase hex — the same field `verify-anchor` parses
+— and the alien ones are those equal to neither your kit's `genesis_key_hash`
+nor a key reached from it by an AUTHORIZED `rotate` lane of the same bundle
+(one whose `key_hash_old` is the LAST key of the set and whose own
+`submitter_key_hash` equals that `key_hash_old`; the derivation walks a LINEAR
+chain from the genesis, so two authorized rotates off the same old key are a
+FORK, not a branch to follow; with `rotations: []`, today's correct state, the
+set is the genesis alone). G-v6-7 judges the non-`rotate`
+leaves: a `rotate` lane feeds the identity derivation instead of being tested
+against it, so exclude `lane.kind == "rotate"` from the read or you will
+weigh a key the gate never looked at. The shape of that read (values here are
+the two keys of the reset):
+
+```
+$ python -c "import json; print(sorted({l['submitter_key_hash'] for l in json.load(open('bundle.json'))['leaves'] if l['lane']['kind'] != 'rotate'}))"
+['85b052121ca91072fecc37279ff503588e4f034ea1fd6405e0a59cbcbb2fc406', 'f50f20fa74c509ff4d1bd197851eb1489a197bd4076295ab40302d9d888101f5']
+```
+
+If the other era's genesis is the only alien key, the FAILED is the
+discontinuity and says nothing against either identity. Any OTHER alien key is
+what G-v6-7 exists to catch — a leaf minted under a key that never received an
+authorized rotation — and it stays a finding for the era whose kit produced
+it, whatever else the bundle contains.
+
+**Do NOT narrow the enumeration to the live genesis to make the FAILED go
+away.** An enumeration that collects exactly the leaves whose submitter is in
+the set your kit derives satisfies this gate by construction: no other leaf
+was collected, so no other leaf can fail it, and the COMPLETITUD it yields is
+vacuous on precisely the one check that can surface a key without an
+authorized rotate. Keep the filter broad, re-enumerate, and judge by WHICH
+alien keys remain.
+
+**Who can do that, and what to conclude if you cannot.** Re-enumerating is the
+ENUMERATOR's act: the submitter filter belongs to whoever RUNS the monitor —
+the producer, or the third party whose bundle you obtained (section 7.1) — and
+the scanner that produces it is not among the tools this kit publishes. As the
+holder of a published bundle you can read its keys with the command above, but
+you cannot re-run its scan; ask the party that ran it, or run your own
+enumeration of the log. And if you hold no bundle at all, this FAILED is not
+your result: `verify-anchor` without `--monitor` reports COMPLETITUD
+INCONCLUSIVE, which is the honest verdict for you — a cross-era FAILED
+reported by someone else does not turn it into FAILED.
+<!-- completitud-reset-rule:end -->
 
 ---
 
@@ -720,9 +891,13 @@ logic is a public library, and a program of your own can reproduce the
 results. Both programs below were compiled against the published crates.io
 release (`=0.3.0`) and run on 2026-07-20; the chain program independently
 reproduced the exact head the installed binary printed for that day's chain
-snapshot (151 rows, head `fcc388ce4e24…`). Section 3's capture is a later,
-larger snapshot of the same growing chain — dated records of real runs are
-left at the row count that produced them rather than restated.
+snapshot (151 rows, head `fcc388ce4e24…`). That snapshot, like section 3's
+2026-07-27 capture (287 rows, a later snapshot of the same chain), belongs to
+the identity RETIRED on 2026-08-24 (section 7.3): the chain those numbers
+describe was wiped, and the live chain restarted at ordinal 1 under a new
+genesis. The programs and their logic are unchanged; run against a fresh
+export they print a small row count that grows from 1. Dated records of real
+runs are left at the row count that produced them rather than restated.
 
 The pins below say `=0.3.3` while that capture was taken with `=0.3.0`, and the
 gap is stated rather than hidden. Across `0.3.0` through `0.3.3` every
@@ -821,7 +996,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-Real output against the same export as section 3, captured 2026-07-20:
+Real output captured 2026-07-20 against the retired chain's export of that day
+(an earlier snapshot than section 3's 2026-07-27 capture; both belong to the
+identity retired on 2026-08-24 — a fresh export gives a smaller count and
+another head):
 
 ```
 chain export: 151 rows, ordinals contiguous from 1, every hash link recomputed OK
