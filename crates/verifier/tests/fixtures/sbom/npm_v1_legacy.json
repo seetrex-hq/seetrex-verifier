@@ -1,0 +1,12 @@
+{
+    "name": "example-app",
+    "version": "1.0.0",
+    "lockfileVersion": 1,
+    "requires": true,
+    "dependencies": {
+        "plain-lib": {
+            "version": "1.2.3",
+            "resolved": "https://registry.example.invalid/plain-lib/-/plain-lib-1.2.3.tgz"
+        }
+    }
+}

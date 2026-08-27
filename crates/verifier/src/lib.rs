@@ -45,6 +45,12 @@
 //!   `SCOPE_LINK_CLAIM`) shared verbatim by the public verifier binary and the
 //!   `compliance-cli`, so the two surfaces cannot disagree about what the
 //!   OFFLINE chain check covers.
+//! - [`sbom`] — the canonical SBOM projection: a lockfile is projected
+//!   into a CycloneDX document with no clock and no random identifier,
+//!   serialized through the same JCS primitive as the verdict hash, so
+//!   an auditor holding the public lockfile re-derives the published
+//!   SBOM byte for byte. ONE implementation, shared by the producer and
+//!   the verifier.
 //! - [`types`] — `VerdictOutcome`, the closed set of the three verdicts.
 //!
 //! The crate depends on `seetrex-format` (the pure format layer: the
@@ -67,6 +73,7 @@ pub mod hash;
 pub mod merkle;
 pub mod package;
 pub mod rulesets;
+pub mod sbom;
 pub mod scope;
 pub mod types;
 

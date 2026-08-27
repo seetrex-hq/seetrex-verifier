@@ -1,0 +1,56 @@
+{
+    "name": "example-app",
+    "version": "1.0.0",
+    "lockfileVersion": 3,
+    "requires": true,
+    "packages": {
+        "": {
+            "name": "example-app",
+            "version": "1.0.0",
+            "dependencies": {
+                "outer-lib": "^3.0.0",
+                "inner-lib": "^1.0.0"
+            },
+            "devDependencies": {
+                "dev-only-lib": "^0.9.0",
+                "@example-scope/dev-widget": "^0.4.0"
+            }
+        },
+        "node_modules/@example-scope/dev-widget": {
+            "version": "0.4.0",
+            "resolved": "https://registry.example.invalid/@example-scope/dev-widget/-/dev-widget-0.4.0.tgz",
+            "integrity": "sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+            "dev": true,
+            "license": "MIT",
+            "author": {
+                "name": "Example Maintainer",
+                "email": "maintainer@example.invalid"
+            },
+            "funding": "https://example.invalid/funding"
+        },
+        "node_modules/dev-only-lib": {
+            "version": "0.9.0",
+            "resolved": "https://registry.example.invalid/dev-only-lib/-/dev-only-lib-0.9.0.tgz",
+            "dev": true,
+            "license": "MIT"
+        },
+        "node_modules/inner-lib": {
+            "version": "1.0.0",
+            "resolved": "https://registry.example.invalid/inner-lib/-/inner-lib-1.0.0.tgz",
+            "license": "MIT"
+        },
+        "node_modules/outer-lib": {
+            "version": "3.0.0",
+            "resolved": "https://registry.example.invalid/outer-lib/-/outer-lib-3.0.0.tgz",
+            "license": "MIT",
+            "dependencies": {
+                "inner-lib": "^2.0.0"
+            }
+        },
+        "node_modules/outer-lib/node_modules/inner-lib": {
+            "version": "2.5.0",
+            "resolved": "https://registry.example.invalid/inner-lib/-/inner-lib-2.5.0.tgz",
+            "license": "MIT"
+        }
+    }
+}

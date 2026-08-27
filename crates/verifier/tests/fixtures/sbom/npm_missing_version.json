@@ -1,0 +1,19 @@
+{
+    "name": "example-app",
+    "version": "1.0.0",
+    "lockfileVersion": 3,
+    "requires": true,
+    "packages": {
+        "": {
+            "name": "example-app",
+            "version": "1.0.0",
+            "dependencies": {
+                "no-version-lib": "^1.0.0"
+            }
+        },
+        "node_modules/no-version-lib": {
+            "resolved": "https://registry.example.invalid/no-version-lib/-/no-version-lib-1.0.0.tgz",
+            "license": "MIT"
+        }
+    }
+}

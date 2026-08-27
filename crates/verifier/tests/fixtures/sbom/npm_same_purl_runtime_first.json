@@ -1,0 +1,40 @@
+{
+    "name": "example-app",
+    "version": "1.0.0",
+    "lockfileVersion": 3,
+    "requires": true,
+    "packages": {
+        "": {
+            "name": "example-app",
+            "version": "1.0.0",
+            "dependencies": {
+                "alpha-runtime": "^1.0.0"
+            },
+            "devDependencies": {
+                "zulu-dev": "^1.0.0"
+            }
+        },
+        "node_modules/alpha-runtime": {
+            "version": "1.0.0",
+            "resolved": "https://registry.example.invalid/alpha-runtime/-/alpha-runtime-1.0.0.tgz",
+            "license": "MIT"
+        },
+        "node_modules/alpha-runtime/node_modules/shared-lib": {
+            "version": "2.0.0",
+            "resolved": "https://registry.example.invalid/shared-lib/-/shared-lib-2.0.0.tgz",
+            "license": "MIT"
+        },
+        "node_modules/zulu-dev": {
+            "version": "1.0.0",
+            "resolved": "https://registry.example.invalid/zulu-dev/-/zulu-dev-1.0.0.tgz",
+            "dev": true,
+            "license": "MIT"
+        },
+        "node_modules/zulu-dev/node_modules/shared-lib": {
+            "version": "2.0.0",
+            "resolved": "https://registry.example.invalid/shared-lib/-/shared-lib-2.0.0.tgz",
+            "dev": true,
+            "license": "MIT"
+        }
+    }
+}

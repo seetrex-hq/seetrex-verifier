@@ -1,0 +1,40 @@
+{
+    "name": "example-app",
+    "version": "1.0.0",
+    "lockfileVersion": 3,
+    "requires": true,
+    "packages": {
+        "": {
+            "name": "example-app",
+            "version": "1.0.0",
+            "dependencies": {
+                "runtime-outer": "^1.0.0"
+            },
+            "devDependencies": {
+                "dev-outer": "^1.0.0"
+            }
+        },
+        "node_modules/dev-outer": {
+            "version": "1.0.0",
+            "resolved": "https://registry.example.invalid/dev-outer/-/dev-outer-1.0.0.tgz",
+            "dev": true,
+            "license": "MIT"
+        },
+        "node_modules/dev-outer/node_modules/shared-lib": {
+            "version": "2.0.0",
+            "resolved": "https://registry.example.invalid/shared-lib/-/shared-lib-2.0.0.tgz",
+            "dev": true,
+            "license": "MIT"
+        },
+        "node_modules/runtime-outer": {
+            "version": "1.0.0",
+            "resolved": "https://registry.example.invalid/runtime-outer/-/runtime-outer-1.0.0.tgz",
+            "license": "MIT"
+        },
+        "node_modules/runtime-outer/node_modules/shared-lib": {
+            "version": "2.0.0",
+            "resolved": "https://registry.example.invalid/shared-lib/-/shared-lib-2.0.0.tgz",
+            "license": "MIT"
+        }
+    }
+}

@@ -1,0 +1,13 @@
+{
+    "content-hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "packages": [
+        {
+            "name": "example-vendor/no-version",
+            "type": "library"
+        }
+    ],
+    "packages-dev": [],
+    "aliases": [],
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

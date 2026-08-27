@@ -1,0 +1,35 @@
+# What `seetrex-verifier <subcommand> --help` REALLY exits with, in this tree.
+#
+# This file is an OBSERVATION, not a claim. `crates/verifier/tests/bin_e2e.rs`
+# spawns the built executable once per row and asserts the row against the
+# process's real exit code, and asserts that the rows are exactly the
+# subcommands the binary's own `--help` lists. A subcommand cannot land, and an
+# exit code cannot change, without this file moving with it.
+#
+# `crates/witness/tests/kit_doc.rs` reads this file INSTEAD OF PARSING the
+# verifier's source. Three source-text matchers were defeated in three
+# consecutive rounds: a character window reached the neighbouring match arm;
+# brace matching from the nearest preceding `=> {` was beaten by a nested
+# `match` inside the arm, by a braceless arm above the reject arm, and by a
+# `#[cfg]`-gated arm pair. Arm order, nesting and conditional compilation are
+# SEMANTICS. No matcher over the text decides them, and each narrower matcher
+# shipped a docstring asserting it did.
+#
+# Format: <key><TAB><exit code>. Every key is a subcommand and its value the
+# exit code of `<subcommand> --help`, EXCEPT the literal `--help`, which is the
+# tool's own top-level help: docs/AUDITOR_KIT.md section 7.4(e) publishes that
+# code too, and a number an auditor is handed comes from this file or from
+# nowhere.
+#
+# That last sentence is about THIS file only, and it does not generalise to the
+# other record: crates/witness/tests/fixtures/published_verifier_help.tsv, the
+# vendored description of the PUBLISHED tool, covers `<subcommand> --help` only
+# and carries no `--help` row — one there is refused by name, because every
+# non-`version` key in that file is taken for a subcommand.
+# Measured 2026-08-26 on the tree released as seetrex-verifier 0.3.4.
+--help	0
+verify-anchor	2
+verify-chain	1
+verify-package	2
+emit-sbom	2
+verify-sbom	2

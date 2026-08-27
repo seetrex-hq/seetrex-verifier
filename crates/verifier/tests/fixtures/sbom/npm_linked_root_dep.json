@@ -1,0 +1,50 @@
+{
+    "name": "example-app",
+    "version": "1.0.0",
+    "lockfileVersion": 3,
+    "requires": true,
+    "packages": {
+        "": {
+            "name": "example-app",
+            "version": "1.0.0",
+            "dependencies": {
+                "linked-lib": "^1.0.0",
+                "plain-lib": "^1.2.0"
+            },
+            "devDependencies": {
+                "linked-dev-lib": "^2.0.0",
+                "extra-lib": "^2.0.0"
+            }
+        },
+        "node_modules/extra-lib": {
+            "version": "2.0.0",
+            "resolved": "https://registry.example.invalid/extra-lib/-/extra-lib-2.0.0.tgz",
+            "dev": true,
+            "license": "MIT"
+        },
+        "node_modules/linked-dev-lib": {
+            "resolved": "workspaces/linked-dev-lib",
+            "link": true
+        },
+        "node_modules/linked-lib": {
+            "resolved": "workspaces/linked-lib",
+            "link": true
+        },
+        "node_modules/plain-lib": {
+            "version": "1.2.3",
+            "resolved": "https://registry.example.invalid/plain-lib/-/plain-lib-1.2.3.tgz",
+            "license": "MIT"
+        },
+        "workspaces/linked-dev-lib": {
+            "name": "linked-dev-lib",
+            "version": "2.0.0",
+            "dev": true,
+            "license": "MIT"
+        },
+        "workspaces/linked-lib": {
+            "name": "linked-lib",
+            "version": "1.0.0",
+            "license": "MIT"
+        }
+    }
+}

@@ -57,7 +57,9 @@ use crate::anchor::{
     derive_producer_identity_set, serialize_preimage, verify_consistencia, IdentitySet, Lane, Mode,
     PreimageError, RotationRecord, Verdict,
 };
-use crate::anchor_completitud::{verify_completitud, MonitorEnumeration, SlugObservation};
+use crate::anchor_completitud::{
+    verify_completitud_reported, MonitorEnumeration, SlugObservation, TruncationReference,
+};
 use crate::chain_export::PublicChainRow;
 use crate::checkpoint::{
     verify_anchored_inclusion, verify_checkpoint, verify_rotate_inclusion, AnchoredLeaf,
@@ -655,6 +657,16 @@ pub struct AnchoredPackageReport {
     pub consistencia: Verdict,
     pub completitud: Verdict,
     pub identity: Option<IdentitySet>,
+    /// What COMPLETITUD's truncation rule ACTUALLY judged against, or `None` when
+    /// those rules never ran (no monitor, or an early refusal above them).
+    ///
+    /// It is reported rather than left to the caller because it is NOT derivable
+    /// from the inputs the caller holds: a supplied chain export can be DECLINED,
+    /// and a declined export raises nothing. A caller that recomputes
+    /// `max(package, supplied_export)` to tell the auditor what happened prints a
+    /// number the rule never used - measured on a live run, `reference N=41` on a
+    /// verdict decided against N=12.
+    pub truncation_reference: Option<TruncationReference>,
 }
 
 /// The auditor's monitor-side inputs to [`verify_anchored_package`],
@@ -711,6 +723,36 @@ pub fn verify_anchored_package(
     pkg: &AnchorPackage,
     monitor: Option<&MonitorAudit>,
 ) -> AnchoredPackageReport {
+    verify_anchored_package_with_chain(tenant_slug, genesis_key_hash, policy, pkg, monitor, None)
+}
+
+/// [`verify_anchored_package`] plus `published_chain`: the producer's CURRENT
+/// published chain export, when the auditor has one.
+///
+/// CONSISTENCIA is UNAFFECTED - it never reads the export. The export decides ONE
+/// question, in COMPLETITUD's truncation rule (G-v6-2): an enumerated `HEAD@k` that
+/// the package's own rows do not reach. `pkg.rows` is a SNAPSHOT of the chain taken
+/// when the package was emitted, and a producer that submits heads to the log more
+/// often than it emits packages publishes a package that legitimately LAGS the log.
+/// Judged against `pkg.rows`, that lag is indistinguishable from a producer who
+/// DELETED rows whose tail leaf stays in the log - so with no export the rule reports
+/// a NAMED `INCONCLUSO` naming this input, and with one it is decided by the export's
+/// length. See [`verify_completitud_with_chain`] for the full rule.
+///
+/// The export is UNTRUSTED producer material, exactly like `pkg`: it is checked
+/// against the package (they must agree over the rows both reach) and is DECLINED,
+/// never accused on, when they disagree.
+///
+/// ADDITIVE: [`verify_anchored_package`] keeps its `0.3.3` signature and its
+/// behaviour (it calls this with `None`), so no existing caller changes.
+pub fn verify_anchored_package_with_chain(
+    tenant_slug: &str,
+    genesis_key_hash: [u8; 32],
+    policy: &WitnessPolicy,
+    pkg: &AnchorPackage,
+    monitor: Option<&MonitorAudit>,
+    published_chain: Option<&[PublicChainRow]>,
+) -> AnchoredPackageReport {
     let completitud = Verdict::Inconclusive {
         reason: "COMPLETITUD not evaluated — enumeration-dependent; either no \
                  monitor was supplied or the offline CONSISTENCIA verdict did not complete"
@@ -732,6 +774,7 @@ pub fn verify_anchored_package(
             },
             completitud,
             identity: None,
+            truncation_reference: None,
         };
     }
 
@@ -749,6 +792,7 @@ pub fn verify_anchored_package(
                     consistencia: verdict,
                     completitud,
                     identity: None,
+                    truncation_reference: None,
                 }
             }
         }
@@ -762,6 +806,7 @@ pub fn verify_anchored_package(
                 },
                 completitud,
                 identity: None,
+                truncation_reference: None,
             }
         }
     };
@@ -781,6 +826,7 @@ pub fn verify_anchored_package(
                 consistencia: verdict,
                 completitud,
                 identity: Some(identity),
+                truncation_reference: None,
             };
         }
     }
@@ -805,18 +851,26 @@ pub fn verify_anchored_package(
     // them, reaching here with the checkpoint UNAUTHENTICATED. Authenticate it
     // explicitly and fail closed if it does not verify, so an unauthenticated
     // checkpoint can never certify COMPLETITUD.
-    let completitud = match monitor {
-        None => completitud,
+    // The reference COMES OUT of the rules that used it; it is never recomputed
+    // here or by the caller. `None` means the rules did not run - no monitor, or an
+    // early refusal above them - and a caller must render that as "not evaluated"
+    // rather than filling it in (see [`TruncationReference`]).
+    let (completitud, truncation_reference) = match monitor {
+        None => (completitud, None),
         Some(m) => match verify_checkpoint(policy, &pkg.checkpoint) {
-            Err(e) => Verdict::Inconclusive {
-                reason: format!(
-                    "package checkpoint not authenticated ({e:?}) — no freshness \
-                     reference to establish COMPLETITUD against"
-                ),
-            },
-            Ok(root) => verify_completitud(
+            Err(e) => (
+                Verdict::Inconclusive {
+                    reason: format!(
+                        "package checkpoint not authenticated ({e:?}) — no freshness \
+                         reference to establish COMPLETITUD against"
+                    ),
+                },
+                None,
+            ),
+            Ok(root) => verify_completitud_reported(
                 tenant_slug,
                 &pkg.rows,
+                published_chain,
                 &lanes,
                 pkg.checkpoint.size,
                 root,
@@ -832,6 +886,7 @@ pub fn verify_anchored_package(
         consistencia,
         completitud,
         identity: Some(identity),
+        truncation_reference,
     }
 }
 

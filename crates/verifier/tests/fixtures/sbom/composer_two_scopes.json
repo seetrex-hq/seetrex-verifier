@@ -1,0 +1,16 @@
+{
+    "name": "example-org/example-portal",
+    "type": "project",
+    "description": "Synthetic root manifest of the composer corpus",
+    "require": {
+        "php": "^8.3",
+        "ext-json": "*",
+        "lib-icu": "*",
+        "example-vendor/runtime-lib": "^1.4"
+    },
+    "require-dev": {
+        "example-vendor/test-lib": "^3.1"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

@@ -1,0 +1,146 @@
+{
+  "corpus": "canonical-sbom-lockfile-v1",
+  "paths_relative_to": "crates/verifier/tests/fixtures/sbom",
+  "note": [
+    "The cross-ecosystem reproducibility corpus of the canonical SBOM projection.",
+    "Every entry names a synthetic, immutable lockfile, the subject purl an auditor",
+    "supplies for it, and the SHA-256 of the canonical bytes that lockfile projects to.",
+    "The hash is a FROZEN pin: it changes only when the projection changes, and the",
+    "projection changing is exactly what the pin exists to make observable.",
+    "The same constants are re-derived on every platform that runs the suite -- the",
+    "development machine (Windows) and continuous integration (Linux) -- so a one-byte",
+    "divergence between two operating systems turns one of the two runs red against",
+    "the same file. Recomputing a pin to make a run green is the one edit forbidden",
+    "here: it converts a measurement into a transcription.",
+    "Real lockfiles are deliberately ABSENT from this file. They change legitimately",
+    "with every dependency bump, so they carry invariants instead of pins."
+  ],
+  "entries": [
+    {
+      "id": "cargo-lock-v3",
+      "kind": "cargo",
+      "lockfile": "cargo_lock_v3.lock",
+      "manifest": null,
+      "subject": "pkg:cargo/example-app@1.2.3",
+      "shape": "lockfile format version 3, one workspace member, one registry package",
+      "canonical_sha256": "7d5db1e3da96a3e9bc07cbd596bcef257128c12b4795c80ed309128ee14e2f9a"
+    },
+    {
+      "id": "cargo-lock-v4",
+      "kind": "cargo",
+      "lockfile": "cargo_lock_v4.lock",
+      "manifest": null,
+      "subject": "pkg:cargo/example-app@1.2.3",
+      "shape": "lockfile format version 4, two workspace members: the member the subject does not name IS a top-level edge, and the merged set is taken across members",
+      "canonical_sha256": "82a20b8aa31fdc52f6b851ba1ad851c131887378540535d4eca070acea2c91b4"
+    },
+    {
+      "id": "cargo-two-versions",
+      "kind": "cargo",
+      "lockfile": "cargo_two_versions.lock",
+      "manifest": null,
+      "subject": "pkg:cargo/example-app@1.2.3",
+      "shape": "one name resolved at two versions: two components, dedup by purl not by name",
+      "canonical_sha256": "4337aa3c1e6a5947062be1633bf5d2cb61d383f8509e47ec1fb94272975b6739"
+    },
+    {
+      "id": "cargo-v3-path-source",
+      "kind": "cargo",
+      "lockfile": "cargo_v3_path_source.lock",
+      "manifest": null,
+      "subject": "pkg:cargo/example-app@1.2.3",
+      "shape": "lockfile format version 3 with every digest inline, including a path+ source that legitimately carries none; replaces the [metadata]-table entry, whose shape is now REJECTED (it records its digests where this parser does not read them) and therefore projects to nothing to pin",
+      "canonical_sha256": "5a366378e432f3dcf7a8665144bf2f5632a5b22a0593b6c781a52996b83b0e97"
+    },
+    {
+      "id": "cargo-empty-source",
+      "kind": "cargo",
+      "lockfile": "cargo_empty_source.lock",
+      "manifest": null,
+      "subject": "pkg:cargo/example-app@1.2.3",
+      "shape": "an empty source string is a present source key, not a workspace member; it carries a checksum like every other digest-bearing source",
+      "canonical_sha256": "955df9b082e1f20d11e1df3e63ee3f2d22f349bd13edad0c29e2f06a82c02e57"
+    },
+    {
+      "id": "composer-two-scopes",
+      "kind": "composer",
+      "lockfile": "composer_two_scopes.lock",
+      "manifest": "composer_two_scopes.json",
+      "subject": "pkg:composer/example-org/example-portal@1.0.0",
+      "shape": "packages and packages-dev, a v-prefixed version kept verbatim, three platform requirements excluded",
+      "canonical_sha256": "c5554594b6e232cc74922eec98d15f7738bbe91de6b36d90dae30f5286770bc5"
+    },
+    {
+      "id": "composer-platform-only",
+      "kind": "composer",
+      "lockfile": "composer_two_scopes.lock",
+      "manifest": "composer_platform_only.json",
+      "subject": "pkg:composer/example-org/example-portal@1.0.0",
+      "shape": "a manifest requiring only platform packages: an empty top-level set that is earned, not missing",
+      "canonical_sha256": "99a180804b98182f2f77fedeaf73250eda87862329cdd781e11eb55a1a44dbf8"
+    },
+    {
+      "id": "npm-nested",
+      "kind": "npm",
+      "lockfile": "npm_nested.json",
+      "manifest": null,
+      "subject": "pkg:npm/example-app@1.0.0",
+      "shape": "a nested node_modules entry keeps its own resolved version; a scoped, development-only entry carrying integrity, author and funding is scoped optional and reaches the document as identity alone",
+      "canonical_sha256": "99b1915dc6bd39609ed460429f0f382713c5d4052fdf207f371c5b950d4f9d77"
+    },
+    {
+      "id": "npm-scoped",
+      "kind": "npm",
+      "lockfile": "npm_scoped.json",
+      "manifest": null,
+      "subject": "pkg:npm/example-app@1.0.0",
+      "shape": "a scoped package: the scope becomes a group and a percent-encoded purl namespace",
+      "canonical_sha256": "431a4bd5c77c0f85cc87d078d2ad7ebb6b6f3100402eaab50dc70c08159d551d"
+    },
+    {
+      "id": "npm-lock-v2",
+      "kind": "npm",
+      "lockfile": "npm_lock_v2.json",
+      "manifest": null,
+      "subject": "pkg:npm/example-app@1.0.0",
+      "shape": "lockfileVersion 2: the packages object wins and the legacy dependencies block is ignored",
+      "canonical_sha256": "79ac087aed5221b9c2bc197e923b0e0191e60137983003829a39378ca14ed0b5"
+    },
+    {
+      "id": "npm-same-purl-two-scopes",
+      "kind": "npm",
+      "lockfile": "npm_same_purl_two_scopes.json",
+      "manifest": null,
+      "subject": "pkg:npm/example-app@1.0.0",
+      "shape": "one purl reached by a dev path and a runtime path, the DEV entry sorting first: one component, scoped required",
+      "canonical_sha256": "b86bdbeb95d099aedd32d403c05c7b8c7d4c6974bbf1556da92d2ae4865fd9de"
+    },
+    {
+      "id": "npm-same-purl-runtime-first",
+      "kind": "npm",
+      "lockfile": "npm_same_purl_runtime_first.json",
+      "manifest": null,
+      "subject": "pkg:npm/example-app@1.0.0",
+      "shape": "the same collision in the OTHER order, the RUNTIME entry sorting first: without it last-wins and the required-beats-optional merge give the same answer and the merge is unmeasured",
+      "canonical_sha256": "84c0b64fd49bc11655f83880658a7b1dd2e158775c7e65aca2539fdec594f961"
+    },
+    {
+      "id": "npm-linked-root-dep",
+      "kind": "npm",
+      "lockfile": "npm_linked_root_dep.json",
+      "manifest": null,
+      "subject": "pkg:npm/example-app@1.0.0",
+      "shape": "a root requirement satisfied by a link entry: omitted from the top-level set, counted, and no dangling edge",
+      "canonical_sha256": "59dfd99b9cf3575c5ac8ab3d7cb67602e7902cb53cb0ccf310e0bf2f80e9ea45"
+    },
+    {
+      "id": "npm-linked",
+      "kind": "npm",
+      "lockfile": "npm_linked.json",
+      "manifest": null,
+      "subject": "pkg:npm/example-app@1.0.0",
+      "shape": "a link entry is omitted from the components and the omission is counted",
+      "canonical_sha256": "7d14b119def22d189474c7663a6077940485144cc9381e5e0559a10dc7693c77"
+    }
+  ]
+}

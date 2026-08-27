@@ -46,7 +46,12 @@ pub const PUBLIC_CHAIN_SCHEMA_VERSION: &str = "1.0";
 /// file you hold; it does not pin N against a shorter file, so
 /// truncation from the end verifies — `verify_public_chain` returns
 /// `verdict_count` = the rows PRESENT, not a claimed total.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// `PartialEq`/`Eq` are load-bearing, not conveniences: the COMPLETITUD export
+// gate compares a package row against an export row for FULL equality, and
+// `chain_hash` binds only `chain_prev_hash` and `verdict_hash` through
+// `SHA256(prev || verdict_hash)` - never `verdict_id`, `appended_at`,
+// `ruleset_id` or `verdict_outcome`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PublicChainRow {
     /// 1-based position in append order (spec §8.1).

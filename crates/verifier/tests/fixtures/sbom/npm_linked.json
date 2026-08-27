@@ -1,0 +1,29 @@
+{
+    "name": "example-app",
+    "version": "1.0.0",
+    "lockfileVersion": 3,
+    "requires": true,
+    "packages": {
+        "": {
+            "name": "example-app",
+            "version": "1.0.0",
+            "dependencies": {
+                "plain-lib": "^1.2.0"
+            }
+        },
+        "node_modules/linked-lib": {
+            "resolved": "workspaces/linked-lib",
+            "link": true
+        },
+        "node_modules/plain-lib": {
+            "version": "1.2.3",
+            "resolved": "https://registry.example.invalid/plain-lib/-/plain-lib-1.2.3.tgz",
+            "license": "MIT"
+        },
+        "workspaces/linked-lib": {
+            "name": "linked-lib",
+            "version": "1.0.0",
+            "license": "MIT"
+        }
+    }
+}

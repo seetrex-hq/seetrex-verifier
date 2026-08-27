@@ -1,0 +1,29 @@
+{
+    "name": "example-app",
+    "version": "1.0.0",
+    "lockfileVersion": 3,
+    "requires": true,
+    "packages": {
+        "": {
+            "name": "example-app",
+            "version": "1.0.0",
+            "dependencies": {
+                "plain-lib": "^1.2.0"
+            }
+        },
+        "node_modules/decoy": {
+            "resolved": "node_modules\\hidden-lib",
+            "link": true
+        },
+        "node_modules\\hidden-lib": {
+            "version": "6.6.6",
+            "resolved": "https://registry.example.invalid/hidden-lib/-/hidden-lib-6.6.6.tgz",
+            "license": "MIT"
+        },
+        "node_modules/plain-lib": {
+            "version": "1.2.3",
+            "resolved": "https://registry.example.invalid/plain-lib/-/plain-lib-1.2.3.tgz",
+            "license": "MIT"
+        }
+    }
+}

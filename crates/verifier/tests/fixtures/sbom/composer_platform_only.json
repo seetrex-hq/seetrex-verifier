@@ -1,0 +1,11 @@
+{
+    "name": "example-org/example-portal",
+    "type": "project",
+    "description": "A root manifest whose requirements are all platform requirements",
+    "require": {
+        "php": "^8.3",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "lib-icu": "*"
+    }
+}

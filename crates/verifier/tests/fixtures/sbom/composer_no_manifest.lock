@@ -1,0 +1,25 @@
+{
+    "_readme": [
+        "A lockfile with no root require: composer never writes one here"
+    ],
+    "content-hash": "fedcba9876543210fedcba9876543210",
+    "packages": [
+        {
+            "name": "example-vendor/runtime-lib",
+            "version": "1.4.0",
+            "type": "library"
+        }
+    ],
+    "packages-dev": [
+        {
+            "name": "example-vendor/test-lib",
+            "version": "3.1.0",
+            "type": "library"
+        }
+    ],
+    "aliases": [],
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "platform": {},
+    "platform-dev": {}
+}

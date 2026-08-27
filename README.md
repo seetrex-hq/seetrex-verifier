@@ -50,16 +50,26 @@ cargo test --locked
 ## Getting the verification tool
 
 `seetrex-verifier` has shipped an installable command-line binary of the
-same name since 0.3.0. Install the current version, `0.3.3`: the `0.3.0`
+same name since 0.3.0. Install the current version, `0.3.4`: the `0.3.0`
 and `0.3.1` binaries printed a `verify-chain` trailer that overstated the
 scope of that check, and must not be used as the executable.
 
 ```bash
-cargo install seetrex-verifier --locked --version 0.3.3
+cargo install seetrex-verifier --locked --version 0.3.4
 
 seetrex-verifier verify-package <dir> [--expected-verdict-hash <hex>]
 seetrex-verifier verify-chain <chain-export.json>
+seetrex-verifier emit-sbom --kind <cargo|composer|npm> --lockfile <path>
+                           [--manifest <composer.json>] --subject <purl>
+                           --out <path>
+seetrex-verifier verify-sbom --kind <cargo|composer|npm> --lockfile <path>
+                             [--manifest <composer.json>] --subject <purl>
+                             --sbom <path> [--third-party] [--dep-v0 <elf>]
 ```
+
+`emit-sbom` and `verify-sbom` are new in 0.3.4: they write and confront the
+canonical `lockfile-v1` SBOM projection specified by
+[`docs/SPEC_SBOM_CANONICAL_V1.md`](docs/SPEC_SBOM_CANONICAL_V1.md).
 
 See [`crates/verifier`](crates/verifier) for the outcome vocabulary and
 exit codes (they follow the spec, section 9.6).

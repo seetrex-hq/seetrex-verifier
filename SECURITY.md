@@ -20,16 +20,30 @@ it affects, and how to reproduce it. Proof-of-concept code, logs and
 screenshots help. Write in English or Spanish, whichever you prefer.
 
 Two URLs are the canonical locations for this policy on the web: the
-machine-readable form of the contact belongs at
+machine-readable form of the contact at
 <https://seetrex.com/.well-known/security.txt> (RFC 9116), and the full
 coordinated vulnerability disclosure policy at <https://seetrex.com/security>.
-Said plainly, because this file is not the place to overstate: both of those
-paths are not yet live. The deployment that would serve them from the apex has
-not happened, so today they answer with the site shell and not with the policy.
-**Until that deployment lands, the text in this file is the policy that
-governs.** When it lands, the page at <https://seetrex.com/security> becomes the
+Both of them are live, and this file says so only because it was measured on
+2026-08-25: the first answered HTTP 200 with `content-type: text/plain;
+charset=utf-8`, byte for byte the file this repository ships at that path; the
+second answered HTTP 200 and the bundle it loads carries the reporting address.
+A path that does not exist under `/.well-known/` answers 404 rather than the
+site shell, and <https://compliance.seetrex.com/security> hands the request to
+the apex with a 301. The page at <https://seetrex.com/security> is the
 authoritative copy, this file stays the copy that travels with the source, and
 if the two ever disagree the page wins.
+
+There is a third place to read this policy, and it is the one that needs no
+trust in our web hosting: the public verifier repository, at
+<https://raw.githubusercontent.com/seetrex-hq/seetrex-verifier/main/SECURITY.md>.
+Measured the same day, that URL answered HTTP 200 with `content-type:
+text/plain` and 7 773 bytes, under the signed document tag
+`seetrex-kit-2026-08-25-cvd-policy` — a good OpenPGP signature from
+fingerprint `F028DE16D3B2AA440FE26F05CECC557729596616`. Read it from two of the
+three and compare. When this file changes here, the served copies follow on the
+next deploy and the next export and not before, so a served copy that lags this
+one is expected rather than alarming; where they differ, the page at
+<https://seetrex.com/security> governs.
 
 ## Scope of this repository
 

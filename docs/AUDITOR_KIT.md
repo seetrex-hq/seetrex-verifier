@@ -1,9 +1,9 @@
 # Seetrex Compliance — Auditor Kit
 
 <!-- doc-revision:begin -->
-**Document revision: `2026-08-24-genesis-reset`.** If your copy lacks this
-line it predates the genesis reset of 2026-08-24 (section 7.3) and its kit
-pins a RETIRED identity. The current copy is the one under the NEWEST signed
+**Document revision: `2026-08-27-full-enumeration`.** If your copy lacks a
+revision line at all it predates the genesis reset of 2026-08-24 (section 7.3)
+and its kit pins a RETIRED identity. The current copy is the one under the NEWEST signed
 tag of the public verifier repository named in section 2.2 whose date is on
 or after 2026-08-24 — a tag dated earlier (such as `seetrex-verifier-v0.3.3`,
 2026-07-27) carries the retired revision. The presence of this line does not
@@ -85,14 +85,17 @@ Two Rust crates are published, both Apache-2.0:
 | Crate | Version | Role |
 |---|---|---|
 | `seetrex-format` | `1.0.0` | the pure format layer: the package's serde types + the RFC 8785 (JCS) canonicalization primitive |
-| `seetrex-verifier` | `0.3.3` | the offline verification core (verdict-hash preimages v1/v2, chain link, ruleset anchor, evidence content hash) **plus the `seetrex-verifier` executable** with the `verify-package`, `verify-chain` and `verify-anchor` subcommands |
+| `seetrex-verifier` | `0.3.4` | the offline verification core (verdict-hash preimages v1/v2, chain link, ruleset anchor, evidence content hash) **plus the `seetrex-verifier` executable** with the `verify-package`, `verify-chain`, `verify-anchor`, `emit-sbom` and `verify-sbom` subcommands |
 
-Version `0.3.3` is the current release. It is ADDITIVE over `0.3.2`: it adds
-the `verify-anchor` subcommand and the anchor-verification library modules
-(see the `CHANGELOG`); every check this kit walks through uses only
+Version `0.3.4` is the current release. It is ADDITIVE over `0.3.3`: it adds
+the `emit-sbom` and `verify-sbom` subcommands with their SBOM projection
+library modules, and it gives `verify-anchor` the optional `--chain` input of
+section 7.4(e) (see the `CHANGELOG`). `0.3.3` was ADDITIVE over `0.3.2` in the
+same way: it added the `verify-anchor` subcommand and the anchor-verification
+library modules. Every check this kit walks through uses only
 `verify-chain` and `verify-package`, whose behaviour, formats and exit codes
-are unchanged — so `0.3.2` also remains valid for everything in this
-document. `0.3.0` was the first to
+are unchanged across all of them — so `0.3.2` also remains valid for
+everything in this document. `0.3.0` was the first to
 ship the installable executable (`0.2.0` was library-only); `0.3.0` and `0.3.1`
 are both superseded, because their `verify-chain` trailers overstated what the
 chain check covers — corrected in `0.3.2`, see section 3. crates.io versions
@@ -100,9 +103,9 @@ are immutable, so all remain downloadable forever; pin `0.3.2` or later.
 Unlike the earlier pair, `0.3.2` is not the same library code with only a new
 executable: that correction moved the tool's scope wording into a shared
 `scope` module (`scope.rs`, exposed through `lib.rs`) and fixed two library doc
-comments (`chain_export.rs`, `canonical.rs`); `0.3.3` goes further and adds
-whole new modules — though none of it changes a result the checks in this
-kit compute; see appendix A. Line endings differ across
+comments (`chain_export.rs`, `canonical.rs`); `0.3.3` and `0.3.4` go further
+and add whole new modules — though none of it changes a result the checks in
+this kit compute; see appendix A. Line endings differ across
 releases: `0.3.1` alone shipped CRLF; `0.3.0`, `0.3.2` and `0.3.3` are LF
 (verified against the published `.crate` bytes on 2026-07-27 — an earlier
 revision of this kit misstated `0.3.2` as CRLF). So a `0.3.2`↔`0.3.3` diff
@@ -132,19 +135,62 @@ Literal output, captured 2026-07-27 (build lines elided):
 exact version this kit was captured with, add `--version 0.3.3`. Confirm
 what you installed:
 
+<!-- verifier-subcommands:begin -->
 ```
 $ seetrex-verifier --version
-seetrex-verifier 0.3.3
+seetrex-verifier 0.3.4
 ```
 
-The executable has three subcommands — `verify-package <dir>
+The executable has five subcommands — `verify-package <dir>
 [--expected-verdict-hash <hex>]` and `verify-chain <file.json>`, used in
-sections 3 and 4, and `verify-anchor <anchor.json> --kit <kit.json>
-[--monitor <bundle>]`, new in `0.3.3` and documented by its own `--help`
-output and the `CHANGELOG`; section 7 walks through the live
-`verify-anchor` run against the published anchor packages. Running the
-tool with no or incomplete arguments prints usage and exits with code `2`
-(verified; distinct from every verification outcome).
+sections 3 and 4; `verify-anchor <anchor.json> --kit <kit.json>
+[--monitor <bundle>] [--chain <chain.json>]`, used in section 7, whose
+`--chain` input is new in `0.3.4` and whose other arguments are those of
+`0.3.3`; and the two SBOM subcommands, new in `0.3.4`,
+`emit-sbom --kind <cargo|composer|npm> --lockfile <path>
+[--manifest <composer.json>] --subject <purl> --out <path>` and
+`verify-sbom --kind <cargo|composer|npm> --lockfile <path>
+[--manifest <composer.json>] --subject <purl> --sbom <path> [--third-party]
+[--dep-v0 <elf>]`, which project a lockfile to a canonical SBOM and confront a
+document with that projection. No check in this kit uses either of them; they
+are enumerated because the tool offers them and an enumeration that stops
+short is one an auditor cannot trust. The tool's top-level `--help` output
+and the `CHANGELOG` document all five; the subcommands carry none of their
+own.
+
+<!-- EDITOR: the region below is pinned by an intent test in the producer's
+     source tree, and only for its NUMBERS. Every published subcommand must be
+     named here with the exit code measured for it, written as an integer in
+     backticks with no letter and no digit between it and its subcommand; and
+     the backticked integers of the whole region, counted, must be exactly one
+     printing of each subcommand's own measured code. If a sentence here needs
+     a number for any other reason, it belongs below the :end marker.
+     WHAT NO TEST READS: the SENTENCES. Their wording, their polarity and
+     their headline are human-reviewed prose like the rest of this document —
+     a number written any way other than an integer between backticks is not
+     seen either. Change one and a reviewer, not a red banner, is what stands
+     between the change and an auditor. -->
+<!-- subcommand-help-codes:begin -->
+**Asking a subcommand for help is not uniform, and one of the answers collides
+with a verification outcome.** Measured against the PUBLISHED
+`0.3.4`, which is what sections 2.1 and 2.2 hand you: `verify-package --help`
+exits `2`, `verify-anchor --help` exits `2`, `emit-sbom --help` exits `2` and
+`verify-sbom --help` exits `2`, while `verify-chain --help` exits
+`1` — the code a FAILED verification returns, because that subcommand takes its
+file positionally and tries to OPEN the argument as a path, printing
+`ERROR: cannot read …` on stderr. Read the message, never the code, if you ever
+type one of them. Each subcommand named above is reconciled against a record
+that the producer's test suite measures by RUNNING the tool; this kit does not
+check that that suite keeps running. The region publishes no other backticked
+INTEGER — an integer is what the test counts, so a number written any other way
+(spelled out, or with a `.` inside the backticks) is not seen at all. The
+sentences around them are reviewed by a human, not by a test.
+<!-- subcommand-help-codes:end -->
+
+Section 7 walks through the live `verify-anchor` run against the published
+anchor packages. Running the tool with no or incomplete arguments prints usage
+and exits with code `2`, which is distinct from every verification outcome.
+<!-- verifier-subcommands:end -->
 
 ### 2.2 Route B — build from the signed tag on GitHub
 
@@ -152,15 +198,17 @@ Source of truth: `https://github.com/seetrex-hq/seetrex-verifier`. Release
 tags are GPG-signed with the Seetrex Compliance release-signing key. Verify
 the tag before trusting the tree.
 
-The current release is `0.3.3`; the walkthrough below verifies its signed tag
-`seetrex-verifier-v0.3.3`.
+The current release is `0.3.4`; its signed tag is `seetrex-verifier-v0.3.4`.
+The walkthrough below is the literal capture of the SAME procedure run against
+`seetrex-verifier-v0.3.3` on 2026-07-27; every command, key and check is
+identical, and only the tag name and the object it resolves to change.
 
 <!-- verifier-tag-era:begin -->
-**Tool release and document revision are two different things.** `0.3.3` (tag
-dated 2026-07-27) is the current release of the VERIFIER: the executable did
-not change with the genesis reset of 2026-08-24, and every check in this kit
-runs on it. The copy of THIS DOCUMENT carried by that tag is a different
-matter — it is the RETIRED revision, and its section 7.3 pins the retired
+**Tool release and document revision are two different things.** `0.3.4` (tag
+dated 2026-08-27) is the current release of the VERIFIER, and every check in
+this kit runs on it. The copy of THIS DOCUMENT carried by an EARLIER tag is a
+different matter — under `seetrex-verifier-v0.3.3` (2026-07-27) it is the
+RETIRED revision, and its section 7.3 pins the retired
 genesis key. For the document, use the tag that publishes this revision: the
 newest signed tag of this repository dated on or after 2026-08-24. This
 revision cannot name that tag — a tag is created when the revision it carries
@@ -505,7 +553,8 @@ channel.
 `verify-anchor` is the `0.3.3` subcommand that checks a producer's published
 **anchor package** against a **pinned auditor kit** you supply — never
 trusting the package for the tenant identity, genesis key or witness policy —
-and reports two verdicts (its `--help` output is the authoritative wording):
+and reports two verdicts. The authoritative wording for them is the tool's
+top-level `--help` output; the subcommand carries none of its own:
 
 - **CONSISTENCIA** (non-contradiction): confirmed fully offline. Every
   anchored leaf's inclusion proof and the checkpoint cosignatures ARE
@@ -535,7 +584,9 @@ Compose `kit.json` from section 7.3 (`tenant_slug` is the only field that
 changes if more tenants enroll), then run the verification. The transcript
 below is ILLUSTRATIVE, not a re-captured run: its `anchored leaves checked`
 is what a chain freshly reset on 2026-08-24 shows (the ENROLL leaf plus head
-ordinal 1) and grows by one with every anchored head:
+ordinal 1) and grows by one with every anchored head — but only when the
+DAILY witness tick rebuilds the package, so the newest anchored head you see
+normally trails the chain export by up to ~24.25 h (section 7.4(e)):
 
 ```
 $ seetrex-verifier verify-anchor seetrex-compliance-anchor.json --kit kit.json --monitor witness-bundle.json
@@ -549,6 +600,16 @@ $ echo $?
 0
 ```
 
+That is the FORM the `0.3.3` binary of section 6 prints — the one this kit
+tells you to install, and the one `cargo install` gives you. Its COUNTS are the
+illustrative ones flagged just above and nothing else: re-captured live, the
+same command reported `anchored leaves checked: 7` on 2026-08-25 and **20** on
+2026-08-26 after the daily witness tick. The count grows with every anchored
+head; read yours, do not expect this one. 7.4(e.2) describes a change that
+adds a `truncation reference:` line and a `--chain` argument to this
+subcommand; if your binary prints neither, nothing is wrong with it, and
+7.4(e.2)'s last paragraph says why.
+
 The run's explanatory footer states the boundary this walkthrough must not
 blur:
 
@@ -561,7 +622,104 @@ Read that footer against what this walkthrough actually fed it:
 producer's own host — not an independent monitor. This COMPLETITUD CONFIRMED
 is therefore self-attested in BOTH legs (the enumeration and, per 7.4(a),
 the liveness observations). The strong, omission-ruling-out verdict needs an
-enumeration that you or a third party ran under the pinned policy.
+enumeration that you or a third party ran under the pinned policy. **Expect a
+different result when you run it, and expect it to depend on your build.**
+Measured on 2026-08-25 against the live package: with a released `0.3.3`
+binary an independent enumeration turns the COMPLETITUD line above into
+`FAILED` with exit `1` — an accusation of truncation that the numbers do not
+support.
+
+<!-- completitud-ladder:begin -->
+<!-- EDITOR: this region is pinned by an intent test in the producer's source
+     tree. The liveness bullet below is FROZEN word for word (after whitespace
+     flattening, so a rewrap is free and a rewording is not); the three bold
+     inputs are a CLOSED set; every bullet's citation must resolve, quote what
+     those lines say, and name identifiers that really occur in the cited
+     code; and the number words in the region must equal what they count.
+     WHAT NO TEST READS: whether a sentence is normative, hedged, or states a
+     condition. Those are human-reviewed prose — the FROZEN literal above is
+     what that decision looks like when it has to be enforced, and six rounds
+     of word lists are why there is no list here. -->
+**Why your own enumeration costs more than the transcript above — input by
+input, because it is not a count.** These are the three inputs YOU SUPPLY. They
+are not everything COMPLETITUD consults — the paragraph after them names
+failure modes that are not about your inputs at all — but they are the three
+you can do anything about. Each has its own condition, they do not rise and
+fall together, and one of them has no condition at all:
+
+- **a liveness observation for the slug** — required whenever your bundle
+  carries an anchored head, which is every real bundle. There is no condition
+  to escape here: the arm is `None if has_anchored_head` and it returns
+  INCONCLUSIVE on the spot
+  (`crates/verifier/src/anchor_completitud.rs:1041-1046`, "slug has an anchored
+  head but its liveness was not probed"). The published enumerator does not
+  write one — 7.4(d).
+- **a consistency proof in the bundle** — required only when your `C_audit` is
+  LARGER than the package's checkpoint. At EQUAL sizes the check demands an
+  EMPTY proof and matching roots, so supplying none is the correct answer
+  (`crates/verifier/src/merkle.rs:156-157`, "return proof.is_empty() &&
+  first_root == second_root"). If your `C_audit` is SMALLER than the package
+  checkpoint the check returns false outright and NO proof repairs it
+  (`crates/verifier/src/merkle.rs:153-154`, "if first_size > second_size");
+  re-enumerate against a fresher head instead. The published enumerator does
+  not write a proof either — 7.4(d).
+- **the published chain export as `--chain`** — required only when your highest
+  enumerated head runs PAST the package's row count `N`; at or below `N` there
+  is nothing to decide
+  (`crates/verifier/src/anchor_completitud.rs:750-756`, "monitor enumerates
+  HEAD@{m} (the highest head it saw for this slug)"). On the released binary
+  the flag does not exist at all — 7.4(e).
+
+**The producer's own `witness-bundle.json` needs none of the three, and the
+reason is the whole point of this paragraph: it already CARRIES an
+observation.** Measured 2026-08-26: `observations` holds one entry for this
+slug; `consistency_proof` is `[]`, which is correct because its `C_audit` size
+62290 equals the package checkpoint 62290; and its highest head 42 equals `N` =
+42, so there is no truncation question to decide. That is why the transcript
+above is one command on the RELEASED `0.3.3`, with no `--chain` at all (that
+binary does not accept the flag: it exits `2`), printing
+`COMPLETITUD: CONFIRMED OFFLINE` at exit `0`.
+
+**Change that one field and the transcript changes with it.** Set
+`"observations": []` in the very same bundle, run the very same command on the
+very same binary, and `CONFIRMED OFFLINE` becomes
+`COMPLETITUD: INCONCLUSIVE — slug has an anchored head but its liveness was
+not probed — cannot certify the export is served (fail-closed; supply a
+SlugObservation)`, exit `0`. Neither of the other two conditions moved. That is
+the input a reading of this paragraph as "two conditions" loses, and it is the
+one YOUR enumeration will always be missing.
+
+**Three of the ways COMPLETITUD fails are not about your inputs at all, and
+this list is NOT exhaustive — it is what has been measured.** They are
+properties of the material you were given, so no amount of supplying fixes
+them; they are here so a FAILED is not read as your mistake:
+
+- the cosigned checkpoint must authenticate under the pinned witness quorum
+  (`crates/verifier/src/anchor_completitud.rs:1342-1346`, "C_audit not
+  authenticated by pinned quorum"). Measured 2026-08-26 by dropping the 13
+  cosignatures from the published bundle: `FAILED — C_audit not authenticated
+  by pinned quorum: QuorumNotMet { have: 0, need: 2 }`, exit `1`.
+- every head the PACKAGE publishes must appear in your enumeration
+  (`crates/verifier/src/anchor_completitud.rs:979-983`, "but the floor-fresh
+  monitor enumeration"). Measured the same day by dropping the
+  `head@42` leaf: `FAILED — package published HEAD@42 but the floor-fresh
+  monitor enumeration omits it — unattested anchoring (G-v6-2 coverage)`,
+  exit `1`.
+- your `C_audit` must not be SMALLER than the package checkpoint: below it the
+  consistency check returns false outright and no input you supply repairs it
+  (`crates/verifier/src/merkle.rs:153-154`, "if first_size > second_size").
+  Re-enumerate against a fresher head instead.
+
+**So what your own bundle needs depends on WHEN you enumerate.** Always the
+observation. The consistency proof only if you enumerated after the package's
+checkpoint was cut — the normal case, since the package is rebuilt once a day.
+`--chain` only if a head has been submitted since that rebuild. Enumerate in
+the minutes after a daily tick and two of the three are enough; enumerate late
+in the day and you need all three.
+<!-- completitud-ladder:end -->
+
+Read 7.4(e) BEFORE you act on
+any of this, and read 7.4(d) before you build the enumeration itself.
 
 <!-- self-report-probe:begin -->
 The strong reading of those COMPLETITUD lines is governed by 7.4: the
@@ -583,7 +741,11 @@ re-run. The witness ticks once a day and the pipeline republishes hourly, so
 a fresh round almost never straddles a tick; if 2-3 fresh rounds still
 return INCONCLUSIVE, it is not skew — stop and investigate. Note the exit
 code stays `0` on an INCONCLUSIVE: a scripted gate must read the COMPLETITUD
-line, not just the exit status.
+line, not just the exit status. The same daily/hourly split is what makes the
+package itself lag the chain, and with an independent enumeration that lag is
+what `verify-anchor` reports today as a COMPLETITUD `FAILED` with exit 1;
+7.4(e) states the lag, its size, that measured outcome, and what it does and
+does not let you conclude.
 
 ### 7.2 The subcommand's own end-to-end suite, runnable without any download
 
@@ -647,8 +809,10 @@ below are the LIVE ones only in a copy of this document published on or after
 the genesis reset of 2026-08-24. Take them from the tag that publishes this
 revision — the newest signed tag of the repository in section 2.2 whose date
 is on or after 2026-08-24 (section 2.2 explains why no version number can
-name it). The tag `seetrex-verifier-v0.3.3` (2026-07-27) is still the current
-release of the TOOL, and nothing about the reset changed the executable; but
+name it). The tag `seetrex-verifier-v0.3.4` (2026-08-27) is the current
+release of the TOOL, and nothing about the reset changed the executable;
+`0.3.3` stays downloadable and valid for every check in this kit. But the
+earlier tag `seetrex-verifier-v0.3.3` (2026-07-27) predates the reset, so
 the copy of this document under it pins the RETIRED genesis key, and a kit
 composed from it fails every live leaf (sections 7.4c and 7.4d).
 <!-- kit-channel-era:end -->
@@ -881,6 +1045,280 @@ your result: `verify-anchor` without `--monitor` reports COMPLETITUD
 INCONCLUSIVE, which is the honest verdict for you — a cross-era FAILED
 reported by someone else does not turn it into FAILED.
 <!-- completitud-reset-rule:end -->
+
+**What building your own enumeration actually costs today — measured, so this
+kit does not send you after a capability the published tooling lacks.** The
+scanner is not among the tools this kit publishes; the producer's own
+`seetrex-witness enumerate` IS published, and on 2026-08-25 it did not yet emit
+a bundle that a LAGGING package accepts. Two gaps, both in the bundle it
+writes:
+
+- `consistency_proof` is emitted **empty**, unconditionally, and the tool never
+  takes a package checkpoint as input. Against a package older than your own
+  `C_audit` the freshness gate then refuses:
+  `COMPLETITUD: INCONCLUSIVE — C_audit (size 62274) is not a consistency-proven
+  append-only extension of the package checkpoint (size 62090) — freshness not
+  cryptographically established (G-v6-6)`. Closing it takes ONE more public
+  request — `GET https://seasalp.glasklar.is/get-consistency-proof/<package
+  checkpoint size>/<your C_audit size>` — whose `node_hash=` lines (14 of them
+  for 62090 → 62274) are what `consistency_proof` wants.
+- `observations` is emitted **empty for you**. It is populated only when the
+  tool is run with `--emit-anchor-dir` and local export discovery ran — the
+  producer's own staging configuration, not yours — so the flag that fills it
+  is one an auditor has no reason to pass. A bundle with no liveness
+  observation for the audited slug yields
+  `COMPLETITUD: INCONCLUSIVE — slug has an anchored head but its liveness was
+  not probed — cannot certify the export is served (fail-closed; supply a
+  SlugObservation)`. That probe is yours to make (the `self-report-probe` block
+  of 7.1) and yours to record.
+
+Both messages above are what a build carrying the 2026-08-25 lag fix prints
+(`0.3.4` and later); a `0.3.3` binary reaches the truncation verdict of
+7.4(e.1) on the same bundle instead. Neither gap is something you can fix from outside, and neither
+is promised fixed here. If you report on this producer, say so plainly: the
+strong path exists and is worth walking, and the published tooling does not
+walk it end to end for you.
+
+<!-- anchor-lag-finding:begin -->
+**(e) The package's newest anchored head is BEHIND the published chain. What
+`verify-anchor` makes of that changed on 2026-08-25, and the change is in the
+tool from `0.3.4` on while `0.3.3` stays installable — so read which build you
+have before you read the verdict.** Everything below was measured on 2026-08-25 against the live
+artifacts; nothing here is predicted.
+
+*What you can check yourself, with two downloads and no host access:* fetch
+`seetrex-compliance-anchor.json` and `seetrex-compliance-chain.json` in the
+same second and compare the highest `head` ordinal among the package's
+`anchored_leaves` with the highest `ordinal` in the chain export. On
+2026-08-25 at 21:05 UTC both files carried the same
+`last-modified: Tue, 25 Aug 2026 21:05:03 GMT`, and yet the package held 12
+rows and 7 leaves whose newest was `head@12` (log leaf index 62089) under a
+checkpoint of size 62090 cosigned at `2026-08-25T00:08:16Z`, while the chain
+export was already at ordinal 39. At the 22:05 UTC republish the package was
+byte-identical to that one (md5 `858aa644437c660d0c15788c488e7c33`) and the
+export had reached ordinal 40.
+
+*What the producer states as the cause* — producer-internal, NOT verifiable
+from your side, and stated here only so the observation above is not read as
+tampering: the package is rebuilt **once a day** by the witness enumerator,
+which stamps it with the rows and the cosigned checkpoint of ITS OWN run
+(`deploy/trust-center/seetrex-witness-enumerate.timer:15,21`,
+"OnCalendar=*-*-* 00:00:00 UTC" + "RandomizedDelaySec=15min"; the unit's own
+comment sizes it, `:20`: "worst case tick-to-tick is 24 h + 15 min"), while
+the hourly Trust-Center pipeline does not rebuild it at all — it copies the
+file the witness left behind and republishes it
+(`scripts/trust-center-pipeline.sh:1315`, "anchor packages: staged
+$anchor_pkg_count package(s) from $ANCHOR_PACKAGES_SRC_DIR"; the copy at
+`:1123,1134`, the publish at `:1333`). **The published package therefore
+trails the chain by up to ~24 h 15 min of witness cadence plus one hourly
+republish — about 24.25 h.** A head appended at 20:05 cannot appear under a
+checkpoint cosigned at 00:08 of that day; that is arithmetic, not a fault.
+
+**(e.1) What a `0.3.3` binary does, and why its verdict is wrong.** `0.3.3` is
+the release before this one and stays installable for ever:
+`cargo install seetrex-verifier --locked --version 0.3.3` gives you exactly
+it, and only
+signed tags are releases (the crate's own `CHANGELOG.md` says so). Run the
+verification of 7.1 with an INDEPENDENT enumeration — the strong path 7.4(d)
+sends you to — and a `0.3.3` binary prints:
+
+```
+  COMPLETITUD:             FAILED — monitor enumerates HEAD@14 but the published chain is only N=12 rows — rows were truncated while their tail leaf stays in the log (G-v6-2)
+$ echo $?
+1
+```
+
+**That accusation is wrong, and the producer says so rather than leaving you to
+discover it.** The `N=12` is the row count of the PACKAGE, not of the chain
+export, which carried 40 rows in the same measurement. Your monitor enumerated
+`head@14` and every later head the log holds; the package's row list stops at
+12 because it is a day old. Nothing was truncated. The check compared a
+day-old artifact against a fresh enumeration and reported the only failure it
+had a name for.
+
+*What that means for you while you hold a `0.3.3` binary:* a scripted gate of
+yours goes red, and it is red for the staleness described above and not for
+removal. Do not report truncation on the strength of that wording — test it
+instead, which you can: keep every export you fetch and check that the next one
+EXTENDS the prefix you hold, ordinal by ordinal and `chain_hash` by
+`chain_hash` (7.1, and the `verify-chain` trailer in section 3). It does NOT
+lower CONSISTENCIA, which is confirmed on the same run.
+
+**(e.2) What the tool does since 2026-08-25 — released in `0.3.4`.** The
+comparison now takes an explicit reference. `verify-anchor` gained an optional
+`--chain <chain.json>` and prints a new line naming what it compared against:
+
+- **without `--chain`** the question is left open — a head beyond the package's
+  N rows yields `COMPLETITUD: INCONCLUSIVE … (G-v6-2 UNDECIDED)` and **exit 0**,
+  and the message names `--chain` as the input that decides it (the exit code
+  staying 0 on an INCONCLUSIVE is the rule 7.1 already states);
+- **with `--chain`**, a head at `k <= N(export)` is a LAG — the head's
+  `chain_hash` is checked against export row `k` — and only `k > N(export)`
+  is `FAILED` with the `G-v6-2` wording unchanged;
+- an export that CONTRADICTS the package over the rows both reach is DECLINED
+  rather than accused on, so a mistyped `--chain` path cannot manufacture a
+  FAILED. A merely SHORTER export agrees over its overlap and is kept: that is
+  the shape truncation actually has.
+
+Measured 2026-08-25 on the live package and an independent enumeration **into
+which a consistency proof and a liveness observation had already been added by
+hand** — 7.4(d) says why you must, and that the published enumerator writes
+neither. Given that bundle, the three runs below differ only in `--chain`:
+
+```
+  truncation reference:    package rows only (no --chain; heads past N are UNDECIDABLE)
+  COMPLETITUD:             INCONCLUSIVE — monitor enumerates HEAD@14, beyond the anchor package's N=12 rows. … Supply the producer's published chain export (--chain <chain.json>) to decide it … (G-v6-2 UNDECIDED)
+$ echo $?
+0
+
+  truncation reference:    published chain export, 40 rows
+  COMPLETITUD:             CONFIRMED OFFLINE (monitor supplied; enumeration completeness = trusted input)
+$ echo $?
+0
+
+  truncation reference:    published chain export, 13 rows          # export truncated by hand, as a control
+  COMPLETITUD:             FAILED — monitor enumerates HEAD@14 but the producer's published chain export is only N=13 rows — rows were truncated while their tail leaf stays in the log (G-v6-2)
+$ echo $?
+1
+```
+
+The third run is the control that keeps the second from being vacuous: with a
+deliberately truncated export the FAILED still fires, so `CONFIRMED` in the
+second run is a verdict about the artifacts and not a check that stopped
+checking.
+
+**What `--chain` does NOT do, so the runs above are not read as more than they
+are.** It changes the reference the truncation rule compares against. On a
+bundle straight out of the published enumerator that leaves the verdict WORD
+where it was — but not the printed line, and the difference is the whole point
+of the flag. Measured 2026-08-26 against the live package, one bundle, only
+`--chain` varying:
+
+- **without it:** `INCONCLUSIVE — C_audit (size 62307) is not a
+  consistency-proven append-only extension of the package checkpoint (size
+  62290) — freshness not cryptographically established (G-v6-6); a stale or
+  forked reference cannot certify completeness. ALSO UNDECIDED: monitor
+  enumerates HEAD@44 (the highest head it saw for this slug), beyond the anchor
+  package's N=42 rows. The package alone cannot tell a producer that TRUNCATED
+  rows from a package that merely LAGS the log …, so nothing is concluded.
+  Supply the producer's published chain export (--chain <chain.json>) to decide
+  it … (G-v6-2 UNDECIDED)`, exit `0`;
+- **with it:** the same `INCONCLUSIVE — C_audit (size 62307) is not a
+  consistency-proven append-only extension of the package checkpoint (size
+  62290) — freshness not cryptographically established (G-v6-6); a stale or
+  forked reference cannot certify completeness` and NOTHING after it — the
+  whole second clause is gone, exit `0`.
+
+So `--chain` decided the truncation question and left the freshness one
+standing — which is the only question it was ever about. Add the consistency
+proof and the verdict moves to `INCONCLUSIVE — slug has an anchored head but
+its liveness was not probed`; add the observation too and the run reaches
+CONFIRMED. Three inputs, in that order, and two of them are yours to construct.
+
+<!-- EDITOR: the region below is pinned by an intent test, and only by
+     ADJACENCY, in two sentences: the code written after the instruction to
+     run the tool's own --help, and the code written after the mention of
+     verify-anchor --help, must each be the one measured for that command and
+     must follow it with no letter and no digit between. This is NOT a count of
+     the codes in the region: any FURTHER exit code written in this paragraph
+     is checked by nothing, and neither is any sentence here. -->
+<!-- top-level-help-code:begin -->
+**Where (e.2) exists: in the release you install.** (e.2) was written on the
+branch
+`fix/completitud-lag-vs-truncation` of the vendor's PRIVATE repository
+(introduced by its commit `75320e2d`), and that branch was folded
+into that repository's `main`: **this tree now carries `--chain`**, and
+**`--chain` ships in `0.3.4`** — the release this revision of the document is
+published with. So the two paragraphs above are the two builds an auditor can
+be holding, and which one you have follows from the version alone: `0.3.3` and
+earlier are (e.1), `0.3.4` and later are (e.2). A `0.3.4` binary prints, in
+its usage summary, exactly
+`seetrex-verifier verify-anchor <anchor.json> --kit <kit.json> [--monitor <bundle.json>] [--chain <chain.json>]`
+(indented four spaces in the real output, and wrapped before
+`[--chain <chain.json>]`). `0.3.3` prints the same entry without that second
+line, and crates.io keeps every version downloadable for ever, so (e.1) does
+not stop being a state somebody is in — it stops being the newest one.
+Do not take any of it from us either — check your own binary. **Run
+`seetrex-verifier --help`** — exits `0`; it prints the tool's usage summary,
+and its `verify-anchor` entry tells you at once which of the two you are
+holding: an entry that ends at `[--monitor <bundle.json>]` is (e.1), and one
+that continues onto a second indented line naming `--chain` is (e.2).
+`verify-anchor --help` exits `2` — the code section 2 reserves
+for your own invocation error — and is NOT the command to use here: the
+subcommand rejects the argument, so its output would read as your mistake
+rather than as an answer to the question. Only (e.2) prints the
+`truncation reference:` line, so the flag and that line arrive together; if
+your binary has neither, (e.1) is your section, and upgrading to `0.3.4` is
+what moves you out of it. This revision of the kit is written against `0.3.4`.
+<!-- top-level-help-code:end -->
+
+*Do not read any of this as "inclusion in the log stops at ordinal 12."* It
+does not, and the difference matters: what stops at the package's newest
+anchored head is the proof **the producer publishes**, not what the log will
+tell you. `seasalp.glasklar.is` answers for the current head to anybody, with
+no host access and no producer file but the chain export:
+
+1. build the leaf preimage from the export row — `seetrex/anchor/v1/head`
+   `0x00` `<tenant_slug>` `0x00` `<ordinal>` `0x00` `<chain_hash>` — and take
+   `checksum = SHA256(SHA256(preimage))`;
+2. `GET https://seasalp.glasklar.is/get-leaves/<lo>/<hi>` and find the line
+   `leaf=<checksum> <signature> <key_hash>` whose `key_hash` equals your kit's
+   `genesis_key_hash`; the wire format carries no index, so the leaf's index is
+   `lo` plus its position in the batch;
+3. `GET https://seasalp.glasklar.is/get-inclusion-proof/<size>/<leaf_hash>`
+   with `leaf_hash = SHA256(0x00 || checksum || signature || key_hash)` (RFC
+   6962 over the 128-byte Sigsum leaf), and fold the returned audit path (the
+   inclusion-proof section of RFC 9162) against the `root_hash` of
+   `GET https://seasalp.glasklar.is/get-tree-head`, whose log signature and
+   witness cosignatures your kit's pinned `policy` authenticates.
+
+Run on 2026-08-25 against the export served at 22:05:02 UTC: tree head size
+**62274**, root `8dd7a28017b4d00a…3190ba5`, 13 cosignatures, log signature
+valid and all three pinned witnesses cosigning against a quorum of 2. Under
+that root, ordinal 38 sits at leaf index **62245**, ordinal 39 at **62261**,
+ordinal 40 at **62273**, and the package's own `head@12` at **62089** — four
+folds, the same root each time.
+
+**What sits in the log is the tick HEAD, not every row — try this before you
+try anything else, because looking for a row's own leaf is what will fail.**
+Anchoring is per tick: one leaf for the head ordinal of each tick, none for the
+rows behind it. Enumerated 2026-08-26 under the pinned `genesis_key_hash`,
+**over the whole log at tree size 62299, against a chain export of 43 rows**,
+the leaves are the `enroll` plus ordinals 2, 4, 6, 8, 10, 12, 14, 16, 18, 20,
+22, 24, 26, 28, 38, 39, 40, 41, 42 and 43 — and nothing else AT THAT SIZE. Both
+numbers are part of the claim: the log and the chain both grow, every later
+tick adds one more head and nothing behind it, so a list without its tree size
+and its chain length is a sentence that goes false on its own. **EIGHT of the
+nine CRA rows, ordinals 30 to 37, have no leaf of their own** — and no later
+tick will give them one. They are proved TRANSITIVELY, through the head that
+commits them: `head@38` is in the log with the inclusion proof above, and
+`chain_hash[38]` commits rows 1..38 through the links of section 3. That is
+what "the rows are anchored" means here, and it is weaker than a per-row proof
+in exactly one way — you must accept the link recomputation of section 3 to get
+from the head to the row.
+
+*The check that turns the lag from an explanation into a finding.* A lag is
+benign only while it CLOSES. Re-fetch the package after the next daily tick
+(the witness fires between 00:00 and 00:15 UTC, and the next hourly republish
+carries it, so from the **01:05 UTC** republish onward) and confirm its newest
+anchored head has advanced past the ordinal you recorded. **It did, and this
+is the observation to hold the vendor to:** the package served at
+`last-modified: Wed, 26 Aug 2026 01:05:03 GMT` carries **42 rows and 20
+anchored leaves** under a checkpoint of size **62290**, against a chain export
+of 43 rows at the same republish. The 12-row package of the paragraph above was
+the lag; this is it closing, one daily tick later, exactly as the cadence
+predicts. Nothing here asks you to take the closure on trust — it is two
+downloads. If two consecutive daily ticks leave the newest anchored head where
+it was while the chain export keeps growing, the lag is no longer cadence —
+stop and raise it: that is the shape of a submitter that has silently stopped,
+and it is indistinguishable from cadence in any single download.
+
+*What this section does NOT promise.* It records behaviour measured on
+2026-08-25 with the two builds named above. It announces no release, no change
+to the publication cadence, and nothing here is a reason to postpone the
+checks. If a later revision of this document reports a different outcome, that
+revision is the one to trust — and its date is the one to read.
+<!-- anchor-lag-finding:end -->
 
 ---
 

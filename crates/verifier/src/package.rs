@@ -54,6 +54,48 @@ position in the chain or its freshness (that is `verify-chain` against the \
 published chain export with an externally obtained anchor). Package-internal \
 consistency alone is never a trust root.";
 
+/// The ONE spelling of the reserved strong-pass token, for every surface
+/// of these crates.
+///
+/// It lived as three separate literals -- the byte string of the sanitizer
+/// below, a `const` of `sbom::compare`, and a `const` of `sbom` -- and the
+/// three did not agree about CASE, which is the whole of the guarantee:
+/// the sanitizer matched case-insensitively while the purl grammar refused
+/// only the uppercase spelling, so `VeRiFiEd` became a legal component
+/// name and then a masked one, and a difference report printed two
+/// distinct purls as one identical string.
+pub const RESERVED_TOKEN: &str = "VERIFIED";
+
+/// True when `value`, taken WHOLE, is the reserved token -- in any case.
+///
+/// This is the predicate a GRAMMAR asks: `is` a purl path segment, or a
+/// version, the reserved token? It is deliberately not "does this string
+/// contain it": npm ships real packages whose names carry the substring
+/// (`verified-fetch` and its scoped siblings), and refusing to project a
+/// lockfile that resolves one would be a false refusal of a real artifact
+/// -- a worse outcome than the masking it would avoid. What remains is
+/// handled at the output boundary of the VERDICT surfaces: a value that
+/// CARRIES the token without being it is admitted and then masked by
+/// [`sanitize_reserved_token`] before any report line reaches a `stdout` or
+/// a `stderr`.
+///
+/// The obligation stops there, and stops there deliberately. A canonical
+/// SBOM is a faithful projection of a lockfile, so a dependency whose real
+/// name carries the token is projected under its real name and the EMITTED
+/// ARTEFACT contains the literal: `emit-sbom` over a lockfile that resolves
+/// `VERIFIED-app` writes those bytes, and it must, because masking them
+/// would forge the bill of materials to protect a shell `grep`. "No surface
+/// ever prints the token" was therefore false of the artefact; what is true
+/// is what the sanitizer actually enforces -- no surface that carries a
+/// VERDICT prints it.
+///
+/// The comparison is case-insensitive because [`sanitize_reserved_token`]
+/// is: a grammar stricter or looser than the sanitizer that follows it is
+/// the drift this predicate exists to remove.
+pub fn is_reserved_token(value: &str) -> bool {
+    value.eq_ignore_ascii_case(RESERVED_TOKEN)
+}
+
 /// Redact every occurrence of the reserved strong-pass token `VERIFIED`
 /// (matched case-insensitively, belt-and-braces) from a line before a
 /// `verify-package` output boundary prints it — spec §9.6 "Reserved
@@ -73,19 +115,19 @@ consistency alone is never a trust root.";
 ///
 /// The token is pure ASCII, so a byte-level scan never splits a multibyte
 /// UTF-8 sequence (continuation bytes are all >= 0x80 and never match an
-/// ASCII byte); replacing ASCII spans with the ASCII `VERIF[REDACTED]` and
-/// copying every other byte verbatim yields valid UTF-8. Note the
-/// replacement does NOT itself contain the substring `VERIFIED`.
+/// ASCII byte); replacing ASCII spans with the ASCII [`RESERVED_TOKEN_MASK`]
+/// and copying every other byte verbatim yields valid UTF-8. Note the mask
+/// does NOT itself contain the substring `VERIFIED`.
 pub fn sanitize_reserved_token(s: &str) -> String {
-    const TOKEN: &[u8] = b"VERIFIED";
-    const REPLACEMENT: &[u8] = b"VERIF[REDACTED]";
+    let replacement = RESERVED_TOKEN_MASK.as_bytes();
+    let token = RESERVED_TOKEN.as_bytes();
     let bytes = s.as_bytes();
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
-        if bytes.len() - i >= TOKEN.len() && bytes[i..i + TOKEN.len()].eq_ignore_ascii_case(TOKEN) {
-            out.extend_from_slice(REPLACEMENT);
-            i += TOKEN.len();
+        if bytes.len() - i >= token.len() && bytes[i..i + token.len()].eq_ignore_ascii_case(token) {
+            out.extend_from_slice(replacement);
+            i += token.len();
         } else {
             out.push(bytes[i]);
             i += 1;
@@ -93,6 +135,28 @@ pub fn sanitize_reserved_token(s: &str) -> String {
     }
     String::from_utf8(out).expect("sanitizer preserves UTF-8 validity (ASCII-only edits)")
 }
+
+/// The ONE mask every redaction of the reserved token renders, on every
+/// surface of these crates.
+///
+/// It is a constant, and public, because a reader who meets it in a report
+/// must be able to look it up. Two masks used to reach one surface -- this
+/// one and a `[reserved-token]` of the comparison module -- with no legend
+/// on either, which left the reader to guess whether they meant the same
+/// thing. One mask, named here, is what a legend can point at.
+pub const RESERVED_TOKEN_MASK: &str = "VERIF[REDACTED]";
+
+/// The one-line legend a surface prints, ONCE, when the mask actually
+/// reached its output.
+///
+/// A mask with no legend is an unexplained string in the middle of
+/// evidence; a legend printed unconditionally is noise that teaches a
+/// reader to skip it. The condition is "the mask is on screen", not "this
+/// process replaced something": an artifact that plants the mask verbatim
+/// is exactly the case where a reader needs the sentence.
+pub const RESERVED_TOKEN_LEGEND: &str = "note: `VERIF[REDACTED]` marks the reserved token \
+                                         redacted from bytes taken from the artifact under \
+                                         test; this tool never emits that token itself";
 
 /// Read cap for any single package file (bytes). Mirrors the CLI replay
 /// paths' `MAX_INPUT_FILE_BYTES` (10 MiB) — an adversarial file must never

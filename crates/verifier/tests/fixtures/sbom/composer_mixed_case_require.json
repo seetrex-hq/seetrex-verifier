@@ -1,0 +1,15 @@
+{
+    "name": "example-org/example-portal",
+    "type": "project",
+    "description": "A root manifest spelling its requirements in mixed case; composer normalizes package names to lowercase, so these are the same two packages the lockfile resolves",
+    "require": {
+        "PHP": "^8.3",
+        "Ext-Json": "*",
+        "Example-Vendor/Runtime-Lib": "^1.4"
+    },
+    "require-dev": {
+        "EXAMPLE-VENDOR/TEST-LIB": "^3.1"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

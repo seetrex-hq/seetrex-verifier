@@ -8,7 +8,7 @@ name = "seetrex-verifier"
 # CLI binary (0.2.0 was library-only, so `cargo install` had nothing to
 # install — an external auditor could not obtain an executable tool from
 # public material).
-version = "0.3.3"
+version = "0.3.4"
 edition.workspace = true
 # Per-crate Apache-2.0 override — this crate is OPEN; the workspace
 # default stays PROPRIETARY and is NOT changed. Full text in ./LICENSE;
@@ -54,3 +54,14 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 hex = { workspace = true }
 rust_decimal = { workspace = true }
+
+[dev-dependencies]
+# Reference TOML parser for the DIFFERENTIAL test of the own `Cargo.lock`
+# parser (`src/sbom/cargo.rs`). Declared INLINE like the other non-workspace
+# pins of this crate, and DEV-only on purpose: the own parser exists so that
+# an auditor's `cargo install seetrex-verifier` does not pull a general TOML
+# parser and its transitive crates, so the reference implementation must not
+# reach the runtime dependency set. The price of writing the parser by hand
+# is paid here: `test_intent_cargo_lock_parser_matches_reference_toml`
+# re-checks it against this crate on every run.
+toml = "0.8"

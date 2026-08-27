@@ -1,0 +1,80 @@
+{
+    "_readme": [
+        "This file locks the dependencies of your project to a known state"
+    ],
+    "content-hash": "0123456789abcdef0123456789abcdef",
+    "packages": [
+        {
+            "name": "example-vendor/runtime-lib",
+            "version": "1.4.0",
+            "source": {
+                "type": "git",
+                "url": "https://example.invalid/runtime-lib.git",
+                "reference": "1111111111111111111111111111111111111111"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://example.invalid/runtime-lib-1.4.0.zip",
+                "reference": "1111111111111111111111111111111111111111",
+                "shasum": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+            },
+            "require": {
+                "php": "^8.0"
+            },
+            "type": "library",
+            "license": [
+                "MIT"
+            ],
+            "description": "A runtime library of the synthetic corpus",
+            "time": "2026-01-02T03:04:05+00:00"
+        },
+        {
+            "name": "example-vendor/v-prefixed",
+            "version": "v2.0.1",
+            "source": {
+                "type": "git",
+                "url": "https://example.invalid/v-prefixed.git",
+                "reference": "2222222222222222222222222222222222222222"
+            },
+            "type": "library",
+            "license": [
+                "MIT"
+            ],
+            "description": "A package whose lockfile version carries a leading v",
+            "time": "2026-01-02T03:04:05+00:00"
+        }
+    ],
+    "packages-dev": [
+        {
+            "name": "example-vendor/test-lib",
+            "version": "3.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://example.invalid/test-lib.git",
+                "reference": "3333333333333333333333333333333333333333"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://example.invalid/test-lib-3.1.0.zip",
+                "reference": "3333333333333333333333333333333333333333",
+                "shasum": ""
+            },
+            "type": "library",
+            "license": [
+                "MIT"
+            ],
+            "description": "A development-only library of the synthetic corpus",
+            "time": "2026-01-02T03:04:05+00:00"
+        }
+    ],
+    "aliases": [],
+    "minimum-stability": "stable",
+    "stability-flags": {},
+    "prefer-stable": true,
+    "prefer-lowest": false,
+    "platform": {
+        "php": "^8.3"
+    },
+    "platform-dev": {},
+    "plugin-api-version": "2.6.0"
+}

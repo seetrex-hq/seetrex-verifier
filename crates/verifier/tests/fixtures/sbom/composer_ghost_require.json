@@ -1,0 +1,9 @@
+{
+    "name": "example-org/example-portal",
+    "type": "project",
+    "description": "A root manifest requiring a package the lockfile does not contain",
+    "require": {
+        "php": "^8.3",
+        "example-vendor/ghost": "^1.0"
+    }
+}

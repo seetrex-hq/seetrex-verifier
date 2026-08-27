@@ -1,0 +1,34 @@
+{
+    "name": "example-app",
+    "version": "1.0.0",
+    "lockfileVersion": 3,
+    "requires": true,
+    "packages": {
+        "": {
+            "name": "example-app",
+            "version": "1.0.0",
+            "dependencies": {
+                "@example-scope/widget": "^0.4.0",
+                "plain-lib": "^1.2.0",
+                "no-integrity-lib": "^2.0.0"
+            }
+        },
+        "node_modules/@example-scope/widget": {
+            "version": "0.4.0",
+            "resolved": "https://registry.example.invalid/@example-scope/widget/-/widget-0.4.0.tgz",
+            "integrity": "sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+            "license": "MIT"
+        },
+        "node_modules/no-integrity-lib": {
+            "version": "2.0.0",
+            "resolved": "https://registry.example.invalid/no-integrity-lib/-/no-integrity-lib-2.0.0.tgz",
+            "license": "MIT"
+        },
+        "node_modules/plain-lib": {
+            "version": "1.2.3",
+            "resolved": "https://registry.example.invalid/plain-lib/-/plain-lib-1.2.3.tgz",
+            "integrity": "sha1-AAECAwQFBgcICQoLDA0ODxAREhM=",
+            "license": "MIT"
+        }
+    }
+}

@@ -1,0 +1,157 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "serialNumber": "urn:uuid:0f5b7a1c-3d21-4c0a-9d2b-6f2a8c1e4b77",
+  "metadata": {
+    "timestamp": "2026-08-25T16:58:04.797168900Z",
+    "tools": [
+      {
+        "vendor": "CycloneDX",
+        "name": "cargo-cyclonedx",
+        "version": "0.5.9"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "bom-ref": "path+file:///home/auditor/demo-app#demo-app@0.2.0",
+      "name": "demo-app",
+      "version": "0.2.0",
+      "description": "The demonstration application of the reference vector",
+      "scope": "required",
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/demo-app@0.2.0?download_url=file://.",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://example.invalid/demo-app"
+        }
+      ],
+      "components": [
+        {
+          "type": "application",
+          "bom-ref": "path+file:///home/auditor/demo-app#demo-app@0.2.0 bin-target-0",
+          "name": "demo_app",
+          "version": "0.2.0",
+          "purl": "pkg:cargo/demo-app@0.2.0?download_url=file://.#src/main.rs"
+        }
+      ]
+    },
+    "properties": [
+      {
+        "name": "cdx:rustc:sbom:target:triple",
+        "value": "x86_64-unknown-linux-gnu"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#leaf@0.1.0",
+      "author": "A Maintainer <maintainer@example.invalid>",
+      "name": "leaf",
+      "version": "0.1.0",
+      "description": "A leaf crate",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/leaf@0.1.0",
+      "externalReferences": [
+        {
+          "type": "documentation",
+          "url": "https://docs.rs/leaf"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#leaf@0.2.0",
+      "author": "A Maintainer <maintainer@example.invalid>",
+      "name": "leaf",
+      "version": "0.2.0",
+      "description": "A leaf crate",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/leaf@0.2.0",
+      "externalReferences": [
+        {
+          "type": "documentation",
+          "url": "https://docs.rs/leaf"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#midlib@0.3.0",
+      "author": "Another Maintainer <another@example.invalid>",
+      "name": "midlib",
+      "version": "0.3.0",
+      "description": "A middle crate",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "purl": "pkg:cargo/midlib@0.3.0",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://example.invalid/midlib"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "path+file:///home/auditor/demo-app#demo-app@0.2.0",
+      "dependsOn": [
+        "registry+https://github.com/rust-lang/crates.io-index#leaf@0.2.0",
+        "registry+https://github.com/rust-lang/crates.io-index#midlib@0.3.0"
+      ]
+    },
+    {
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#leaf@0.1.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#leaf@0.2.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#midlib@0.3.0",
+      "dependsOn": [
+        "registry+https://github.com/rust-lang/crates.io-index#leaf@0.1.0"
+      ]
+    }
+  ]
+}
