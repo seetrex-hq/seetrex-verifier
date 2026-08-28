@@ -29,6 +29,81 @@ use uuid::Uuid;
 
 const BIN: &str = env!("CARGO_BIN_EXE_seetrex-verifier");
 
+/// Name of the environment variable that points this suite at an
+/// executable OTHER than the one Cargo just built.
+const BIN_OVERRIDE_VAR: &str = "SEETREX_VERIFIER_BIN";
+
+/// The resolution rule itself, as a pure function of the override, so it
+/// can be exercised in both directions without mutating the environment
+/// of a process whose tests run in parallel threads.
+fn bin_from(override_value: Option<String>) -> String {
+    override_value.unwrap_or_else(|| BIN.to_string())
+}
+
+/// The executable these tests spawn: `SEETREX_VERIFIER_BIN` when it is
+/// set in the environment, and the Cargo-built binary otherwise.
+///
+/// The override exists so the SAME suite can be pointed at a release
+/// artifact (a prebuilt, signed binary) and answer whether it yields the
+/// same verdicts as the build cargo produces here. Unset — which is how
+/// CI and every developer run it — nothing changes.
+fn bin() -> String {
+    bin_from(std::env::var(BIN_OVERRIDE_VAR).ok())
+}
+
+/// INTENT: pointing this suite at another executable is OPT-IN and the
+///         default resolution is the binary Cargo just built. If the
+///         override were silently dead, a run that reports "the release
+///         artifact passes" would in fact have measured cargo's own
+///         binary — the verdict-equality claim would be unfalsifiable
+///         while looking green.
+/// CONTEXT: the suite resolved the executable at compile time only
+///          (`const BIN`), so a produced artifact could not be measured
+///          by the very tests that define the tool's behaviour.
+/// EXPIRES IF: the suite stops spawning an external process (e.g. the
+///             CLI is exercised in-process through a library entry
+///             point), at which point there is no executable to point
+///             anywhere.
+#[test]
+fn test_intent_bin_e2e_defaults_to_the_cargo_built_binary() {
+    // The rule, both directions, independent of the ambient environment:
+    // no override -> the Cargo-built binary, verbatim...
+    assert_eq!(
+        bin_from(None),
+        BIN,
+        "with no override the suite must spawn the binary cargo built"
+    );
+    assert!(
+        Path::new(&bin_from(None)).is_file(),
+        "the default resolution must name a file that exists: {BIN}"
+    );
+    // ...an override -> that value, verbatim (never the const).
+    let sentinel = "/nonexistent/seetrex-verifier-override-sentinel";
+    assert_eq!(
+        bin_from(Some(sentinel.to_string())),
+        sentinel,
+        "an override was ignored: the suite would measure cargo's own \
+         binary while reporting another one"
+    );
+
+    // And the live reader is wired to that rule through the documented
+    // variable name. Asserted in whichever state this process is in, so
+    // the check is never vacuous and the environment is never mutated.
+    match std::env::var(BIN_OVERRIDE_VAR) {
+        Ok(v) => assert_eq!(
+            bin(),
+            v,
+            "{BIN_OVERRIDE_VAR} is set but the suite is not reading it"
+        ),
+        Err(_) => assert_eq!(
+            bin(),
+            BIN,
+            "{BIN_OVERRIDE_VAR} is unset and the default moved off the \
+             cargo-built binary"
+        ),
+    }
+}
+
 /// INTENT: the `seetrex-verifier` package manifest DECLARES an
 ///         installable binary target named `seetrex-verifier`, and the
 ///         package build actually produces that executable. Without a
@@ -166,7 +241,7 @@ fn valid_chain_export(n: u32) -> PublicChainExport {
 }
 
 fn run(args: &[&str]) -> Output {
-    Command::new(BIN)
+    Command::new(bin())
         .args(args)
         .output()
         .expect("spawn seetrex-verifier binary")
@@ -2420,7 +2495,7 @@ fn test_intent_subject_rejection_masks_once_and_prints_the_legend() {
             args.push("--out".to_string());
             args.push(out_path.display().to_string());
         }
-        let output = std::process::Command::new(BIN)
+        let output = std::process::Command::new(bin())
             .args(&args)
             .output()
             .expect("spawn the verifier");

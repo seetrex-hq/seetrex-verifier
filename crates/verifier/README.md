@@ -21,16 +21,28 @@ consumes this crate and adds the inference engine on top):
 ## Command-line tool
 
 The crate has shipped an installable binary of the same name since 0.3.0
-(0.2.0 was library-only). Install the current version, `0.3.4`: the `0.3.0`
+(0.2.0 was library-only). Install the current version, `0.3.5`: the `0.3.0`
 and `0.3.1` binaries printed a `verify-chain` trailer that overstated the
 scope of that check, and must not be used as the executable.
 
 ```console
-cargo install seetrex-verifier --locked --version 0.3.4
+cargo install seetrex-verifier --locked --version 0.3.5
 
 seetrex-verifier verify-package <dir> [--expected-verdict-hash <hex>]
 seetrex-verifier verify-chain <chain-export.json>
+seetrex-verifier verify-anchor <anchor.json> --kit <kit.json>
+                               [--monitor <bundle.json>] [--chain <chain.json>]
+seetrex-verifier emit-sbom --kind <cargo|composer|npm> --lockfile <path>
+                           [--manifest <composer.json>] --subject <purl>
+                           --out <path>
+seetrex-verifier verify-sbom --kind <cargo|composer|npm> --lockfile <path>
+                             [--manifest <composer.json>] --subject <purl>
+                             --sbom <path> [--third-party] [--dep-v0 <elf>]
 ```
+
+That is the whole list the binary offers; `seetrex-verifier --help` prints it.
+`verify-anchor` is new in 0.3.3 and its `--chain` input in 0.3.4; the two SBOM
+subcommands are new in 0.3.4.
 
 `verify-package` is the package-integrity check of spec section 9.6 — it
 re-computes hashes only. Its outcome vocabulary and exit codes are the
@@ -45,6 +57,20 @@ package (e.g. from the published chain export).
 (spec section 8.1): it recomputes every SHA-256 link and reports the
 chain head (`verdict_count`, `last_chain_hash`) to compare against the
 published tenant page. Exit 0 on success, 1 on any failure.
+
+`verify-anchor` checks a producer-published anchor package OFFLINE against a
+transparency log's cosigned checkpoint, under the policy pinned in the auditor
+`kit.json`. With `--monitor` it also confronts the package with an independent
+enumeration of the log. `--chain` supplies the producer's published chain
+export as the reference the truncation rule judges against: without it, a head
+beyond the package's rows is reported INCONCLUSIVE and the exit code stays 0,
+so read the COMPLETITUD line and not the exit status alone.
+
+`emit-sbom` writes the canonical `lockfile-v1` projection of a dependency
+lockfile and prints its SHA-256 and nothing else; it verifies nothing and never
+exits 1. `verify-sbom` re-derives that projection from the auditor's own
+lockfile and confronts an untrusted document with it, exiting 0 only on byte
+identity.
 
 This is the SAME code the `compliance-cli` runs — not a replica. An auditor
 compiles exactly what production ran. The crate depends only on

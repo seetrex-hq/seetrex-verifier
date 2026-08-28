@@ -14,8 +14,66 @@ entry's release date is the date of its signed tag.
 
 ## [Unreleased]
 
-Nothing yet. The next entry recorded here is what this tree holds and no
+Nothing is released here yet. What follows is what this tree holds and no
 signed tag carries.
+
+## [seetrex-verifier 0.3.5] — 2026-08-28
+
+Test-harness scaffolding, plus two corrections to the documents that travel
+inside the `.crate`. This is also the first release whose signed tag is built
+to carry prebuilt, signed release binaries: a signing workflow attaches, to the
+GitHub release of the tag, one executable for each of the linux musl targets it
+was dispatched for (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`),
+a `SHA256SUMS` list covering the artifacts it built, and a detached signature
+over that list made with the same release-signing key the tags carry. A run can
+be asked for a single target, so a release may carry just one executable, and
+the signed list is what says which; a release carrying no `SHA256SUMS`
+publishes no binary at all. An executable for a target the runner cannot
+execute - the runner is x86_64, so the aarch64 one - is built and signed there
+and never run there: such an asset is published as built and signed, and claims
+nothing about having been run.
+
+`compliance` and `seetrex-witness` pin the crate with `=0.3.5`, and the auditor
+kit pins the same string. Existing commands, formats and exit codes are
+unchanged: the `src/` tree of this release is byte-identical to the one
+at the `0.3.4` tag (measured with a recursive diff against a fresh clone of
+that tag), so no code, no signature and no output moved. Measured the same
+way, the files of this crate that differ from that tag are five: the
+`version` line of `Cargo.toml`, `tests/bin_e2e.rs`, the label line of
+`tests/fixtures/help_exit_codes.tsv`, `README.md` and this file.
+
+### Changed
+- The CLI end-to-end test suite (`tests/bin_e2e.rs`) now honours
+  the environment variable `SEETREX_VERIFIER_BIN`: when it is set, the suite
+  spawns the executable it names instead of the one the build just produced, so
+  the same tests that define the tool's behaviour can be pointed at a prebuilt
+  binary and answer whether it yields the same verdicts. **The default is
+  unchanged**: with the variable unset - which is how every ordinary
+  `cargo test` runs it, and how every CI leg runs it except the one that exists
+  to point the suite at a prebuilt executable, which sets it deliberately - the
+  suite spawns the binary Cargo built, exactly as before, and a test pins that
+  default. This is test-harness scaffolding only:
+  **no command, no option, no output format, no verdict word and no exit code
+  moves**, the shipped library and binary surfaces are untouched, and the
+  variable has no effect whatsoever on the `seetrex-verifier` executable itself
+  - only on which executable the test suite runs.
+
+### Fixed
+- CHANGELOG: the `0.3.4` entry below claimed that existing commands, formats and
+  exit codes were all unchanged. The exit codes were NOT, and that entry's own
+  `--chain` bullet says so: run WITHOUT `--chain`, `verify-anchor` answers a head
+  beyond the anchor package's rows with `INCONCLUSIVE` and exit 0 where `0.3.3`
+  answered `FAILED` and exit 1 - same invocation, same arguments, same artifacts.
+  The entry is corrected in this tree, under a `### Changed` heading it did not
+  have. The `.crate` published to crates.io as `0.3.4` is IMMUTABLE and still
+  carries the wrong sentence, so an auditor reading the CHANGELOG inside that
+  tarball is reading a false one; this note is the correction, and it reaches
+  crates.io with the next release and no sooner.
+- `README.md`: the command-line section listed `verify-package` and
+  `verify-chain` only, so three subcommands the `0.3.4` binary offers -
+  `verify-anchor`, `emit-sbom` and `verify-sbom` - were missing from the file
+  that travels INSIDE the `.crate`. Corrected in this tree; the published `0.3.4`
+  tarball keeps the short list.
 
 ## [seetrex-verifier 0.3.4] — 2026-08-27
 
@@ -27,9 +85,11 @@ truncation rule decidable. Both are PUBLISHED by this release: the signed tag
 carries none of them.
 
 `compliance` and `seetrex-witness` pin the crate with `=0.3.4`, and the auditor
-kit pins the same string. Existing commands, formats and exit codes are
-unchanged, and the additions to the library surface are additive except for one
-new field on `AnchoredPackageReport`, called out below.
+kit pins the same string. Existing commands and formats are unchanged, and the
+additions to the library surface are additive except for one new field on
+`AnchoredPackageReport`, called out below. Exit codes are NOT all unchanged: one
+existing invocation of `verify-anchor` changes its verdict word and its exit
+status, under `### Changed`.
 
 ### Added
 - `emit-sbom --kind <cargo|composer|npm> --lockfile <f> [--manifest <f>]
@@ -98,6 +158,25 @@ new field on `AnchoredPackageReport`, called out below.
   `verdict_hash` and nothing else - `verdict_id`, `appended_at`, `ruleset_id` and
   `verdict_outcome` sit outside it, and an export contradicting the package in one
   of those was admitted in silence while the gate compared two fields.
+
+### Changed
+- `verify-anchor` run WITHOUT `--chain` no longer reports a head beyond the
+  anchor package's rows as a truncation. The same invocation, over the same
+  artifacts, moves from `COMPLETITUD: FAILED ... rows were truncated ...
+  (G-v6-2)` with exit 1 in `0.3.3` to `COMPLETITUD: INCONCLUSIVE ... (G-v6-2
+  UNDECIDED)` with exit 0 here. This IS a change of exit code for an existing
+  command with existing arguments, and it is deliberate: the `0.3.3` verdict is a
+  false accusation against a producer whose published package legitimately lags
+  its log, reproducible against the published artifacts and printed in section
+  7.4(e.1) of the auditor kit. A scripted gate that read the exit status of
+  `verify-anchor` alone therefore stops going red on that input and must read the
+  COMPLETITUD line instead. Nothing else moves: every other subcommand keeps the
+  exit codes of `0.3.3`, and so does `verify-anchor` on every other input - with
+  `--chain`, a head that no published artifact reaches is still `FAILED` with
+  exit 1 under the same discriminant.
+- `verify-anchor` prints one more line, `truncation reference:`, on every terminal
+  verdict (not on the early exits with code 2, where no verdict is reached).
+  Output shape of an existing command; no on-disk format changed.
 
 ## [seetrex-verifier 0.3.3] — 2026-07-27
 

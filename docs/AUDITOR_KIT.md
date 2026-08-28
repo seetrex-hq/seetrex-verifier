@@ -1,7 +1,7 @@
 # Seetrex Compliance — Auditor Kit
 
 <!-- doc-revision:begin -->
-**Document revision: `2026-08-27-full-enumeration`.** If your copy lacks a
+**Document revision: `2026-08-28-signed-binaries`.** If your copy lacks a
 revision line at all it predates the genesis reset of 2026-08-24 (section 7.3)
 and its kit pins a RETIRED identity. The current copy is the one under the NEWEST signed
 tag of the public verifier repository named in section 2.2 whose date is on
@@ -85,30 +85,43 @@ Two Rust crates are published, both Apache-2.0:
 | Crate | Version | Role |
 |---|---|---|
 | `seetrex-format` | `1.0.0` | the pure format layer: the package's serde types + the RFC 8785 (JCS) canonicalization primitive |
-| `seetrex-verifier` | `0.3.4` | the offline verification core (verdict-hash preimages v1/v2, chain link, ruleset anchor, evidence content hash) **plus the `seetrex-verifier` executable** with the `verify-package`, `verify-chain`, `verify-anchor`, `emit-sbom` and `verify-sbom` subcommands |
+| `seetrex-verifier` | `0.3.5` | the offline verification core (verdict-hash preimages v1/v2, chain link, ruleset anchor, evidence content hash) **plus the `seetrex-verifier` executable** with the `verify-package`, `verify-chain`, `verify-anchor`, `emit-sbom` and `verify-sbom` subcommands |
 
-Version `0.3.4` is the current release. It is ADDITIVE over `0.3.3`: it adds
+Version `0.3.5` is the current release. It moves no command, no format and no
+exit code over `0.3.4`; what it adds is outside the crate, and section 2.4
+covers it: its signed tag is the first to carry prebuilt, signed executables.
+`0.3.4` was ADDITIVE over `0.3.3`: it added
 the `emit-sbom` and `verify-sbom` subcommands with their SBOM projection
-library modules, and it gives `verify-anchor` the optional `--chain` input of
+library modules, and it gave `verify-anchor` the optional `--chain` input of
 section 7.4(e) (see the `CHANGELOG`). `0.3.3` was ADDITIVE over `0.3.2` in the
 same way: it added the `verify-anchor` subcommand and the anchor-verification
-library modules. Every check this kit walks through uses only
+library modules. Every check of sections 3 and 4 uses only
 `verify-chain` and `verify-package`, whose behaviour, formats and exit codes
-are unchanged across all of them — so `0.3.2` also remains valid for
-everything in this document. `0.3.0` was the first to
+are unchanged across all of them — so `0.3.2`, `0.3.3` and `0.3.4` remain valid
+there.
+**Section 7 is the exception, and it is not a small one:** it drives
+`verify-anchor`, which `0.3.2` does not have at all and which a `0.3.3` binary
+answers WRONGLY once you supply an independent enumeration — 7.4(e.1) prints
+that run. Install `0.3.4` or later if you intend to do section 7. `0.3.0` was the first to
 ship the installable executable (`0.2.0` was library-only); `0.3.0` and `0.3.1`
 are both superseded, because their `verify-chain` trailers overstated what the
 chain check covers — corrected in `0.3.2`, see section 3. crates.io versions
-are immutable, so all remain downloadable forever; pin `0.3.2` or later.
+are immutable, so all remain downloadable forever; `0.3.2` is the floor for
+sections 3 and 4, and `0.3.5` is what this document is written against.
 Unlike the earlier pair, `0.3.2` is not the same library code with only a new
 executable: that correction moved the tool's scope wording into a shared
 `scope` module (`scope.rs`, exposed through `lib.rs`) and fixed two library doc
 comments (`chain_export.rs`, `canonical.rs`); `0.3.3` and `0.3.4` go further
-and add whole new modules — though none of it changes a result the checks in
-this kit compute; see appendix A. Line endings differ across
-releases: `0.3.1` alone shipped CRLF; `0.3.0`, `0.3.2` and `0.3.3` are LF
-(verified against the published `.crate` bytes on 2026-07-27 — an earlier
-revision of this kit misstated `0.3.2` as CRLF). So a `0.3.2`↔`0.3.3` diff
+and add whole new modules — though none of it changes a result the section 3
+and 4 checks compute; see appendix A. The section 7 verdict is where `0.3.4`
+does differ, and 7.4(e) is that difference. Line endings differ across
+releases: `0.3.1` alone shipped CRLF; `0.3.0`, `0.3.2`, `0.3.3` and `0.3.4`
+are all LF. Re-measured on 2026-08-27 by fetching both current tarballs from
+`https://static.crates.io/crates/seetrex-verifier/` and counting files that
+contain a carriage return: none of the 24 files of the `0.3.3` tarball and
+none of the 74 of the `0.3.4` one. (An earlier revision of this kit misstated
+`0.3.2` as CRLF; the same measurement corrected it on 2026-07-27.) So a
+`0.3.3`↔`0.3.4` diff
 needs no normalisation, but any comparison INVOLVING `0.3.1` does, or the
 diff reports every file as changed and tells you nothing. The published `Cargo.lock` also advanced a few patch versions
 across releases, which affects `cargo install --locked` and not a library
@@ -120,25 +133,36 @@ consumer.
 cargo install seetrex-verifier --locked
 ```
 
-Literal output, captured 2026-07-27 (build lines elided):
+Literal output, captured 2026-08-27 into an empty install root (build lines
+elided):
 
 ```
     Updating crates.io index
-  Installing seetrex-verifier v0.3.3
-    Finished `release` profile [optimized] target(s) in 45.37s
-   Replacing .../bin/seetrex-verifier.exe
-    Replaced package `seetrex-verifier v0.3.2` with `seetrex-verifier v0.3.3` (executable `seetrex-verifier.exe`)
+  Installing seetrex-verifier v0.3.4
+    Finished `release` profile [optimized] target(s) in 41.73s
+  Installing .../bin/seetrex-verifier.exe
+   Installed package `seetrex-verifier v0.3.4` (executable `seetrex-verifier.exe`)
 ```
 
-(on a machine without a previous install the last lines read `Installing`/
-`Installed package` instead of `Replacing`/`Replaced package`). To pin the
-exact version this kit was captured with, add `--version 0.3.3`. Confirm
-what you installed:
+Over a previous install the last two lines read `Replacing`/`Replaced
+package` instead. Captured the same day, upgrading a `0.3.3` in place:
+
+```
+   Replacing .../bin/seetrex-verifier.exe
+    Replaced package `seetrex-verifier v0.3.3` with `seetrex-verifier v0.3.4` (executable `seetrex-verifier.exe`)
+```
+
+Both captures were taken with the version pinned explicitly; the unpinned
+command above resolves to the same build for as long as `0.3.4` is the newest
+release, which it was when this was written (`https://crates.io/api/v1/crates/seetrex-verifier`
+reported `max_version` `0.3.4` on 2026-08-27, published that day). To pin the
+exact version that dated capture installed, add `--version 0.3.4`; the block
+below is what the CURRENT release prints, and section 2.2 names its tag:
 
 <!-- verifier-subcommands:begin -->
 ```
 $ seetrex-verifier --version
-seetrex-verifier 0.3.4
+seetrex-verifier 0.3.5
 ```
 
 The executable has five subcommands — `verify-package <dir>
@@ -172,8 +196,12 @@ own.
      between the change and an auditor. -->
 <!-- subcommand-help-codes:begin -->
 **Asking a subcommand for help is not uniform, and one of the answers collides
-with a verification outcome.** Measured against the PUBLISHED
-`0.3.4`, which is what sections 2.1 and 2.2 hand you: `verify-package --help`
+with a verification outcome.** The codes here were measured on 2026-08-27
+against the PUBLISHED `0.3.4` — the tool sections 2.1 and 2.2 handed you that
+day — and are derived unchanged for `0.3.5` from the tree this release
+publishes: no subcommand is added, dropped or re-coded between the two, and the
+CLI source has not changed since. Re-observation against the published `0.3.5`
+is owed and has not been made. `verify-package --help`
 exits `2`, `verify-anchor --help` exits `2`, `emit-sbom --help` exits `2` and
 `verify-sbom --help` exits `2`, while `verify-chain --help` exits
 `1` — the code a FAILED verification returns, because that subcommand takes its
@@ -187,6 +215,12 @@ INTEGER — an integer is what the test counts, so a number written any other wa
 sentences around them are reviewed by a human, not by a test.
 <!-- subcommand-help-codes:end -->
 
+When were they observed, and against what: on 2026-08-27, against the tool
+crates.io served as the newest release that day. The install command of section
+2.1 was run into an empty root, each subcommand's `--help` was invoked with the
+binary it produced, and its process exit status was read. The codes are not
+derived from the producer's own tree, which is a superset of what is published.
+
 Section 7 walks through the live `verify-anchor` run against the published
 anchor packages. Running the tool with no or incomplete arguments prints usage
 and exits with code `2`, which is distinct from every verification outcome.
@@ -198,14 +232,19 @@ Source of truth: `https://github.com/seetrex-hq/seetrex-verifier`. Release
 tags are GPG-signed with the Seetrex Compliance release-signing key. Verify
 the tag before trusting the tree.
 
-The current release is `0.3.4`; its signed tag is `seetrex-verifier-v0.3.4`.
-The walkthrough below is the literal capture of the SAME procedure run against
-`seetrex-verifier-v0.3.3` on 2026-07-27; every command, key and check is
-identical, and only the tag name and the object it resolves to change.
+The current release is `0.3.5`; its signed tag is `seetrex-verifier-v0.3.5`.
+The walkthrough below is NOT a capture of that tag: it is the literal capture
+of the PREVIOUS tag, `seetrex-verifier-v0.3.4`, run on 2026-08-27 from a clone
+made minutes earlier into an empty, throwaway GPG home holding nothing but the
+key of step 2. `seetrex-verifier-v0.3.5` verifies by exactly the same commands
+and prints the same lines with its own object id and its own tagger date, and
+so do the earlier tags; only the tag name, the object it resolves to and the
+date change. The capture is re-run against `seetrex-verifier-v0.3.5`, and this
+walkthrough replaced by that transcript, once the tag exists.
 
 <!-- verifier-tag-era:begin -->
-**Tool release and document revision are two different things.** `0.3.4` (tag
-dated 2026-08-27) is the current release of the VERIFIER, and every check in
+**Tool release and document revision are two different things.** `0.3.5` (tag
+dated 2026-08-28) is the current release of the VERIFIER, and every check in
 this kit runs on it. The copy of THIS DOCUMENT carried by an EARLIER tag is a
 different matter — under `seetrex-verifier-v0.3.3` (2026-07-27) it is the
 RETIRED revision, and its section 7.3 pins the retired
@@ -240,19 +279,19 @@ uid                      Seetrex Compliance Release Signing <release@seetrex.com
 gpg --import seetrex-release-key.asc
 git clone https://github.com/seetrex-hq/seetrex-verifier
 cd seetrex-verifier
-git tag -v seetrex-verifier-v0.3.3
+git tag -v seetrex-verifier-v0.3.4
 ```
 
-Expected output — literal capture, 2026-07-27:
+Expected output — literal capture, 2026-08-27:
 
 ```
-object 8b61fe12c228225294bbaa9a883c96d35a9e7702
+object 188324a10102417bea99d42ffd25349b57dbce83
 type commit
-tag seetrex-verifier-v0.3.3
-tagger Seetrex Compliance Release Signing <release@seetrex.com> 1785140802 +0000
+tag seetrex-verifier-v0.3.4
+tagger Seetrex Compliance Release Signing <release@seetrex.com> 1787866724 +0000
 
-seetrex-verifier-v0.3.3
-gpg: Signature made Mon Jul 27 10:26:42 2026
+seetrex-verifier-v0.3.4
+gpg: Signature made Thu Aug 27 23:38:44 2026
 gpg:                using EDDSA key F028DE16D3B2AA440FE26F05CECC557729596616
 gpg: Good signature from "Seetrex Compliance Release Signing <release@seetrex.com>" [unknown]
 gpg: WARNING: This key is not certified with a trusted signature!
@@ -268,20 +307,36 @@ line is *expected*: it says only that you have not personally certified the
 key in your GPG web of trust — the out-of-band fingerprint comparison is the
 check that replaces it. The earlier release tags (`seetrex-format-v1.0.0`,
 `seetrex-verifier-v0.2.0`, `seetrex-verifier-v0.3.0`,
-`seetrex-verifier-v0.3.1` and `seetrex-verifier-v0.3.2`) verify the same way
-with the same key.
+`seetrex-verifier-v0.3.1`, `seetrex-verifier-v0.3.2` and
+`seetrex-verifier-v0.3.3`) verify the same way with the same key, and so do
+the document tags of section 6.
 
 Then build in place — the repository pins its toolchain
 (`rust-toolchain.toml`, channel `1.91.1`) and commits its `Cargo.lock`:
 
 ```
-git checkout seetrex-verifier-v0.3.3
+git checkout seetrex-verifier-v0.3.4
 cargo test --locked          # all suites, including the CLI integration tests
 cargo build --release --locked   # produces target/release/seetrex-verifier
 ```
 
-Result on 2026-07-27 at the `seetrex-verifier-v0.3.3` tag: every suite passes
-(format, verifier library, and CLI tests), zero failures.
+Result on 2026-08-27 at the `seetrex-verifier-v0.3.4` tag: every suite passes,
+zero failures — `seetrex-format` 3, the verifier library 358, the CLI
+integration suite `bin_e2e` 45, and the three intent suites the crate ships
+1 + 4 + 12; both doc-test runs are empty. `cargo build --release --locked`
+then finishes clean and writes `target/release/seetrex-verifier`.
+
+**One environment caveat, and it is not a defect of the tree.** Two of the
+crate's tests read the shipped Markdown specification and split it into
+paragraphs on the two-newline sequence. If your Git checks the working tree
+out with CRLF endings — the default of `core.autocrlf` `true`, which is what a
+Windows install sets — that split never fires and
+`test_intent_spec_allowed_top_level_keys_match_code` fails with a message
+about finding nine top-level keys where the specification names seven.
+Measured on 2026-08-27: the same tag, cloned with `core.autocrlf` `false`,
+passes every suite. Clone with `git -c core.autocrlf=false clone …` (or set
+it before cloning); the published `.crate` on crates.io is LF regardless, so
+`cargo install` is unaffected.
 
 ### 2.3 Route C — pin the signing key out of band
 
@@ -316,6 +371,95 @@ Compare keys **by fingerprint**, never by file bytes: armor line endings can
 legitimately differ between channels (e.g. a git checkout normalizing line
 endings), while the fingerprint is invariant. If any channel disagrees on the
 fingerprint, stop and contact `release@seetrex.com` before trusting anything.
+
+### 2.4 Route D — the signed prebuilt binary
+
+<!-- binary-route:begin -->
+Route D is for the auditor with no Rust toolchain: take the executable we
+built from the signed tag, and check where it came from with nothing but
+`gpg` and `sha256sum`. Route B remains the strong path; the binary is a
+convenience whose trust reduces to the same key and the same tag.
+
+**What is published.** A release carries at most the two linux targets named
+here, `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl`: those two
+are the whole of what the signing job is allowed to build, and a release may
+carry just one of them, because a run can be asked for a single target. There
+is no macOS or Windows binary published today; on those platforms use route A
+(section 2.1) or route B (section 2.2). The artifacts of a release are
+`seetrex-verifier-<version>-<target>`, one per target built, one `SHA256SUMS`
+and one `SHA256SUMS.asc` — raw executables, no archives, so the hash you
+compute is the hash of the bytes you run. The signed `SHA256SUMS` is what
+tells you which of the two a given release actually carries. A tool tag whose
+release carries no `SHA256SUMS` publishes no binary at all, and route A or
+route B is the answer there.
+
+A binary for a target the build host cannot execute is built and signed but is
+not run against the tool's own end-to-end suite before it is published: the
+build host is x86_64 linux, so the aarch64 executable leaves that job without
+that check. The job refuses to publish such a target unless the dispatch says
+so explicitly, which is the record of who decided it; what you get is the same
+signed list over the same bytes, and one fewer check behind them.
+
+**How you check it.** Verification is two commands and needs nothing beyond
+`gpg` and `sha256sum`: `gpg --verify SHA256SUMS.asc SHA256SUMS`, then
+`sha256sum --ignore-missing -c SHA256SUMS`.
+
+`--ignore-missing` is there because the list names every published artifact
+while you downloaded one: it skips the entry for the target you did not fetch,
+so a healthy release does not report `FAILED open or read`. It does not soften
+the check on the file you DID download — `sha256sum` still exits non-zero if
+that file's hash differs from the list, and also if nothing you have is named
+in the list at all, where it says `no file was verified` and fails.
+
+```
+# 1. Get the release-signing key and compare its fingerprint against the one
+#    pinned in 2.3 BEFORE importing it. Same key as route B, same check.
+curl -fsSL -o seetrex-release-key.asc https://seetrex.com/.well-known/release-signing-pubkey.asc
+gpg --show-keys --fingerprint seetrex-release-key.asc
+gpg --import seetrex-release-key.asc
+
+# 2. Get the list, its signature, and the executable for your platform, from
+#    the release of the tool tag you want. Substitute the release version and
+#    one of the two target triples named above.
+curl -fsSL -O https://github.com/seetrex-hq/seetrex-verifier/releases/download/seetrex-verifier-v<version>/SHA256SUMS
+curl -fsSL -O https://github.com/seetrex-hq/seetrex-verifier/releases/download/seetrex-verifier-v<version>/SHA256SUMS.asc
+curl -fsSL -O https://github.com/seetrex-hq/seetrex-verifier/releases/download/seetrex-verifier-v<version>/seetrex-verifier-<version>-<target>
+
+# 3. Both commands, in this order. Either one alone proves nothing.
+gpg --verify SHA256SUMS.asc SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS
+
+# 4. The list names the file by its published name, so keep that name until
+#    the check has passed; rename it to seetrex-verifier afterwards if you
+#    want the short form, then:
+chmod +x seetrex-verifier
+./seetrex-verifier --version
+```
+
+The signature covers the list and the list covers the bytes. Verifying the
+signature and skipping `sha256sum --ignore-missing -c` proves nothing about the binary you are
+about to run.
+
+The key is the same key as route B's, checked the same way, through the
+independent channels of 2.3. Expect the same `WARNING: This key is not
+certified with a trusted signature` line that 2.2 explains, and give it the
+same answer: the out-of-band fingerprint comparison is what replaces the web
+of trust you do not have.
+
+**Where the limits are.** Release assets on a hosting platform are
+replaceable. What is not: the signed tag the binary was built from, and this
+document under its own signed tag. On determinism this route hands you a
+mechanism, not a result: the build job builds each target twice in the same
+build directory, wiping the target's release tree in between so every
+target-side artifact is recompiled, compares the two hashes, and refuses to
+sign if the two differ. What
+that constrains is one job on one machine at one moment; it is silent about
+yours, and nothing here claims a different machine reproduces the same bytes.
+Read no outcome into it: the guarantee is what the job will not do, never a
+run you are being told about. A byte-for-byte result you obtain yourself is
+route B (section 2.2), and that is still the reason route B is the strong
+path.
+<!-- binary-route:end -->
 
 ---
 
@@ -533,9 +677,10 @@ source rebuild under NDA for regulators. To arrange either, contact
 | Artifact | Where it lives | How it is pinned |
 |---|---|---|
 | Release-signing GPG key | `https://seetrex.com/.well-known/release-signing-pubkey.asc` AND `keys/release-signing-pubkey.asc` in the public repository | fingerprint `F028 DE16 D3B2 AA44 0FE2 6F05 CECC 5577 2959 6616`, cross-checked over the independent channels of section 2.3 (this document / vendor domain over TLS / the repository copy as a self-consistency check); compare by fingerprint, not file bytes; ed25519, expires 2028-07-09 |
-| Source repository | `https://github.com/seetrex-hq/seetrex-verifier` | GPG-signed tags, verified with `git tag -v` against the pinned fingerprint. **Document tags** (`seetrex-kit-<date>-<reason>`, one per kit revision; they publish this document, not a tool release): `seetrex-kit-2026-08-24-genesis-reset` at commit `f7ff1f6f3aef…` (this revision — the tag was created after the snapshot it signs, which is why an earlier copy of this row could not name it). **Tool tags**: `seetrex-verifier-v0.3.3` at commit `8b61fe12c228…` (current); `seetrex-verifier-v0.3.2` at commit `54676db4e66b…` (previous, still valid for this kit's checks); superseded: `seetrex-verifier-v0.3.1` at commit `ecea6cc76f10…`, `seetrex-verifier-v0.3.0` at commit `719d0988a1bc…`, `seetrex-format-v1.0.0` and `seetrex-verifier-v0.2.0` at commit `f1dd053c82a1…` |
+| Source repository | `https://github.com/seetrex-hq/seetrex-verifier` | GPG-signed tags, verified with `git tag -v` against the pinned fingerprint (all of them, tool and document alike, verified from a fresh clone on 2026-08-27). **Document tags** (`seetrex-kit-<date>-<reason>`, one per kit revision; they publish this document, not a tool release), newest first: `seetrex-kit-2026-08-27-full-enumeration` at commit `188324a10102…`, `seetrex-kit-2026-08-25-cvd-policy` at commit `e0627ed41e39…`, `seetrex-kit-2026-08-24-genesis-reset` at commit `f7ff1f6f3aef…`. **This list lags by exactly one entry, and does so by construction**: a document tag is created after the snapshot it signs, so the tag that publishes the copy in your hands can never appear in that copy. Read the top entry as the newest that existed when this snapshot was written, and select your document copy by tag DATE (section 2.2), never by this list. **Tool tags**: the current tool tag is `seetrex-verifier-v0.3.5`, and **this revision cannot name the commit it resolves to, by construction** — for the same reason the document-tag list above lags by one entry: a tool tag is created when the release it publishes is cut, which is after the snapshot in your hands was written. It is recorded in the next revision; until then, verify it by name and date as section 2.2 says. The tags this revision can name: `seetrex-verifier-v0.3.4` at commit `188324a10102…`, `seetrex-verifier-v0.3.3` at commit `8b61fe12c228…` and `seetrex-verifier-v0.3.2` at commit `54676db4e66b…` (previous, still valid for the section 3 and 4 checks — see the crate row below for the section 7 exception); superseded: `seetrex-verifier-v0.3.1` at commit `ecea6cc76f10…`, `seetrex-verifier-v0.3.0` at commit `719d0988a1bc…`, `seetrex-format-v1.0.0` and `seetrex-verifier-v0.2.0` at commit `f1dd053c82a1…` |
+| Signed release binaries | attached to the tool tag's release in the public repository above, at most the two linux targets named here (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`) per release, and a release may carry just one of them; no macOS and no Windows binary is published. A tool tag whose release carries no `SHA256SUMS` publishes no binary at all — no release of that tag has one attached, and section 2.1 or section 2.2 is the answer there. A binary for a target the build host cannot execute is built and signed but is not run against the tool's own end-to-end suite before it is published; the job refuses to publish such a target unless the dispatch says so explicitly (section 2.4) | one `SHA256SUMS` lists every artifact and is GPG-signed as `SHA256SUMS.asc` with the release-signing key (fingerprint `F028 DE16 D3B2 AA44 0FE2 6F05 CECC 5577 2959 6616`); verify with `gpg --verify SHA256SUMS.asc SHA256SUMS` and then `sha256sum --ignore-missing -c SHA256SUMS` (section 2.4, where `--ignore-missing` is explained) — the signature covers the list and the list covers the bytes, so both commands or neither. Release assets sit on a platform that permits replacement, and the anchor of these bytes is the signed tag they were built from: this document names no digest of any release, what it anchors is the KEY that signs the list (fingerprint above, checked out of band per section 2.3), and re-deriving the bytes yourself is route B |
 | `seetrex-format` `1.0.0` | crates.io | crates.io versions are immutable; pin with the exact requirement `=1.0.0` |
-| `seetrex-verifier` `0.3.3` | crates.io | immutable; install with `cargo install seetrex-verifier --locked --version 0.3.3` (ships the executable), or pin `=0.3.3` as a library dependency (itself pins `seetrex-format =1.0.0`). `0.3.2` remains valid for every check in this kit (`0.3.3` is additive: it only adds `verify-anchor`). `0.3.0` and `0.3.1` stay downloadable forever and must not be used **as the executable**: their `verify-chain` trailers overstated the check's coverage (section 3). As a library they compute every hash and result identically, but their printed chain-scope wording (and two doc comments) carry the same overclaim `0.3.2` corrected — see appendix A |
+| `seetrex-verifier` `0.3.5` | crates.io | immutable; install with `cargo install seetrex-verifier --locked --version 0.3.5` (ships the executable), or pin `=0.3.5` as a library dependency (itself pins `seetrex-format =1.0.0`). The publication date and the `max_version` read back from the registry API for `0.3.5` are NOT recorded in this revision: what section 2.1 records is the `0.3.4` observation of 2026-08-27, and it stands there, labelled as such, until it is re-captured against the published `0.3.5`. Each release is ADDITIVE over the last (`0.3.3` added `verify-anchor`; `0.3.4` added `emit-sbom`, `verify-sbom` and `verify-anchor --chain`; `0.3.5` adds no subcommand, no option and no output, and moves no exit code), so `0.3.4`, `0.3.3` and `0.3.2` remain valid for every section 3 and section 4 check. **They are not equivalent in section 7**: with an independent enumeration a `0.3.3` binary reaches a truncation verdict the numbers do not support — 7.4(e.1) shows the run, and repairing it is what `0.3.4` is for. `0.3.0` and `0.3.1` stay downloadable forever and must not be used **as the executable**: their `verify-chain` trailers overstated the check's coverage (section 3). As a library they compute every hash and result identically, but their printed chain-scope wording (and two doc comments) carry the same overclaim `0.3.2` corrected — see appendix A |
 | Package format spec | `docs/SPEC_VERDICT_PACKAGE_V1.md` in the source repository | covered by the signed tag; the normative reference for every check in this kit |
 | Public chain export | `https://trust.seetrex.com/seetrex-compliance-chain.json` | self-verifying offline (section 3); head comparable against the Trust Center page (`verdict_count`, `last_chain_hash`), fetched over a channel you control |
 | Build toolchain | `rust-toolchain.toml` (channel `1.91.1`) + committed `Cargo.lock` in the source repository | build and test with `--locked` from the signed tag |
@@ -550,7 +695,8 @@ channel.
 
 ## 7. Anchor verification (`verify-anchor`): scope today, and a runnable demo
 
-`verify-anchor` is the `0.3.3` subcommand that checks a producer's published
+`verify-anchor`, introduced in `0.3.3` and given its optional `--chain` input
+in `0.3.4`, is the subcommand that checks a producer's published
 **anchor package** against a **pinned auditor kit** you supply — never
 trusting the package for the tenant identity, genesis key or witness policy —
 and reports two verdicts. The authoritative wording for them is the tool's
@@ -574,7 +720,7 @@ of this document — never fetched from the host that serves the packages.
 
 ```
 $ seetrex-verifier --version
-seetrex-verifier 0.3.3
+seetrex-verifier 0.3.4
 
 $ curl -sO https://trust.seetrex.com/seetrex-compliance-anchor.json
 $ curl -sO https://trust.seetrex.com/witness-bundle.json
@@ -582,33 +728,39 @@ $ curl -sO https://trust.seetrex.com/witness-bundle.json
 
 Compose `kit.json` from section 7.3 (`tenant_slug` is the only field that
 changes if more tenants enroll), then run the verification. The transcript
-below is ILLUSTRATIVE, not a re-captured run: its `anchored leaves checked`
-is what a chain freshly reset on 2026-08-24 shows (the ENROLL leaf plus head
-ordinal 1) and grows by one with every anchored head — but only when the
-DAILY witness tick rebuilds the package, so the newest anchored head you see
-normally trails the chain export by up to ~24.25 h (section 7.4(e)):
+below is a REAL run, captured on 2026-08-27 with the `0.3.4` binary of
+section 2.1 against the packages published that day. Its COUNTS are of that
+day and nothing else: the chain was reset on 2026-08-24 and started at the
+ENROLL leaf plus head ordinal 1, and it grows by one with every anchored
+head — but only when the DAILY witness tick rebuilds the package, so the
+newest anchored head you see normally trails the chain export by up to
+~24.25 h (section 7.4(e)):
 
 ```
 $ seetrex-verifier verify-anchor seetrex-compliance-anchor.json --kit kit.json --monitor witness-bundle.json
 Anchor package CONSISTENCIA CONFIRMED OFFLINE
   tenant:                  "seetrex-compliance"
-  anchored leaves checked: 2
+  anchored leaves checked: 35
   rotations checked:       0
   identity keys:           1 (genesis + accepted rotations)
+  truncation reference:    package rows only, 57 rows (no --chain; heads past N are UNDECIDABLE)
   COMPLETITUD:             CONFIRMED OFFLINE (monitor supplied; enumeration completeness = trusted input)
 $ echo $?
 0
 ```
 
-That is the FORM the `0.3.3` binary of section 6 prints — the one this kit
-tells you to install, and the one `cargo install` gives you. Its COUNTS are the
-illustrative ones flagged just above and nothing else: re-captured live, the
-same command reported `anchored leaves checked: 7` on 2026-08-25 and **20** on
-2026-08-26 after the daily witness tick. The count grows with every anchored
-head; read yours, do not expect this one. 7.4(e.2) describes a change that
-adds a `truncation reference:` line and a `--chain` argument to this
-subcommand; if your binary prints neither, nothing is wrong with it, and
-7.4(e.2)'s last paragraph says why.
+Read the COUNTS as yours to measure, never as values to expect: the same
+command reported `anchored leaves checked: 7` on 2026-08-25, **20** on
+2026-08-26 and **35** in the capture above, each after a daily witness tick.
+The FORM, however, is what your binary decides. A `0.3.3` binary prints this
+same block WITHOUT the `truncation reference:` line, and rejects the `--chain`
+argument that fills it in with exit `2`; both shipped in `0.3.4`, and
+7.4(e) is the section that tells you which of the two you are holding and
+why it matters. Supplying the published chain export as well
+(`--chain seetrex-compliance-chain.json`) changed only that one line in the
+same 2026-08-27 capture, to
+`published chain export, 68 rows (package 57; reference N=68)`, leaving both
+verdicts and the exit code untouched.
 
 The run's explanatory footer states the boundary this walkthrough must not
 blur:
@@ -667,8 +819,9 @@ fall together, and one of them has no condition at all:
   enumerated head runs PAST the package's row count `N`; at or below `N` there
   is nothing to decide
   (`crates/verifier/src/anchor_completitud.rs:750-756`, "monitor enumerates
-  HEAD@{m} (the highest head it saw for this slug)"). On the released binary
-  the flag does not exist at all — 7.4(e).
+  HEAD@{m} (the highest head it saw for this slug)"). The flag is in the
+  RELEASED binary from `0.3.4` on; a `0.3.3` binary rejects it with exit `2`
+  — 7.4(e).
 
 **The producer's own `witness-bundle.json` needs none of the three, and the
 reason is the whole point of this paragraph: it already CARRIES an
@@ -676,8 +829,7 @@ observation.** Measured 2026-08-26: `observations` holds one entry for this
 slug; `consistency_proof` is `[]`, which is correct because its `C_audit` size
 62290 equals the package checkpoint 62290; and its highest head 42 equals `N` =
 42, so there is no truncation question to decide. That is why the transcript
-above is one command on the RELEASED `0.3.3`, with no `--chain` at all (that
-binary does not accept the flag: it exits `2`), printing
+above is one command with no `--chain` at all, printing
 `COMPLETITUD: CONFIRMED OFFLINE` at exit `0`.
 
 **Change that one field and the transcript changes with it.** Set
@@ -760,27 +912,49 @@ tarball from crates.io, or use the signed-tag checkout of section 2.2):
 cargo test --test bin_e2e anchor
 ```
 
-Literal output, captured 2026-07-27 against the crates.io `0.3.3` tree:
+Literal output, captured 2026-08-27 from the `seetrex-verifier-v0.3.4` tag
+checkout of section 2.2 (the same tree crates.io serves as the `0.3.4`
+tarball):
 
 ```
-running 8 tests
-test verify_anchor_malformed_kit_exits_2 ... ok
-test test_scenario_verify_anchor_tenant_mismatch_fails ... ok
+running 21 tests
+test test_intent_verify_anchor_chain_without_monitor_is_acknowledged ... ok
+test test_intent_verify_anchor_declined_export_does_not_suppress_the_enumeration ... ok
+test test_intent_verify_anchor_lag_without_chain_is_inconclusive_exit_0 ... ok
+test test_intent_verify_anchor_declined_export_is_never_shown_as_the_reference ... ok
+test test_intent_verify_anchor_repeated_chain_is_usage_error ... ok
+test test_intent_verify_anchor_repeated_kit_and_monitor_are_usage_errors ... ok
+test test_intent_verify_anchor_real_truncation_with_chain_fails_exit_1 ... ok
+test test_intent_verify_anchor_without_chain_is_unchanged ... ok
+test test_intent_verify_anchor_without_monitor_says_the_rule_was_not_reached ... ok
 test test_scenario_verify_anchor_confirmed_offline_no_reserved_token ... ok
+test test_scenario_verify_anchor_tenant_mismatch_fails ... ok
+test verify_anchor_broken_chain_export_exits_1 ... ok
+test verify_anchor_chain_without_value_is_usage_error ... ok
+test verify_anchor_completitud_failed_before_the_truncation_rule_says_so ... ok
+test verify_anchor_malformed_kit_exits_2 ... ok
 test verify_anchor_malformed_monitor_exits_2 ... ok
-test verify_anchor_missing_kit_is_usage_error ... ok
-test verify_anchor_malformed_package_exits_1 ... ok
+test verify_anchor_contradictory_chain_export_is_declined ... ok
 test verify_anchor_empty_honest_monitor_confirms_completitud ... ok
-test verify_anchor_real_monitor_completitud_downgrades ... ok
+test verify_anchor_malformed_package_exits_1 ... ok
+test test_intent_verify_anchor_reference_rises_never_falls ... ok
+test verify_anchor_missing_kit_is_usage_error ... ok
 
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.42s
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 24 filtered out; finished in 0.31s
 ```
 
-(the 6 filtered-out tests cover the other two subcommands, the CLI's
-usage/version behaviour and the crate manifest; the monitor-based anchor
-tests use or derive their `--monitor` input from the crate's embedded
+The same filter returned 8 tests against the `0.3.3` tree on 2026-07-27.
+Seven of those eight are still in the list above; the eighth,
+`verify_anchor_real_monitor_completitud_downgrades`, is not, and the fourteen
+that are new here are largely the `--chain` truncation reference of 7.4(e.2)
+and its refusals. Neither the count nor the names are stable across releases:
+read the run you get, not this list. (The 24 filtered-out tests
+cover the other four subcommands, the CLI's usage/version behaviour and the
+crate manifest; the monitor-based anchor tests use or derive their
+`--monitor` input from the crate's embedded
 `tests/fixtures/fb2c_enumeration_oracle.json`). Invoking the subcommand with missing arguments
-exits `2`, distinct from every verification outcome (re-verified 2026-07-27):
+exits `2`, distinct from every verification outcome (re-verified 2026-08-27
+against the installed `0.3.4`):
 
 ```
 $ seetrex-verifier verify-anchor
@@ -809,9 +983,10 @@ below are the LIVE ones only in a copy of this document published on or after
 the genesis reset of 2026-08-24. Take them from the tag that publishes this
 revision — the newest signed tag of the repository in section 2.2 whose date
 is on or after 2026-08-24 (section 2.2 explains why no version number can
-name it). The tag `seetrex-verifier-v0.3.4` (2026-08-27) is the current
+name it). The tag `seetrex-verifier-v0.3.5` (2026-08-28) is the current
 release of the TOOL, and nothing about the reset changed the executable;
-`0.3.3` stays downloadable and valid for every check in this kit. But the
+`0.3.4` and `0.3.3` stay downloadable and valid for the section 3 and 4 checks
+(the section 6 crate row names the one place `0.3.3` is not equivalent). But the
 earlier tag `seetrex-verifier-v0.3.3` (2026-07-27) predates the reset, so
 the copy of this document under it pins the RETIRED genesis key, and a kit
 composed from it fails every live leaf (sections 7.4c and 7.4d).
@@ -873,7 +1048,7 @@ waiting for a human diff.
 
 | Field | What it is | Independent cross-checks |
 |---|---|---|
-| `version` | the `seetrex/anchor-kit/v1` schema constant | the published `seetrex-verifier` `0.3.3` source (`anchor_package.rs`, `ANCHOR_KIT_VERSION`), on crates.io and under the signed tag |
+| `version` | the `seetrex/anchor-kit/v1` schema constant | the published `seetrex-verifier` `0.3.4` source (`anchor_package.rs:443`, `ANCHOR_KIT_VERSION`), on crates.io and under the signed tag; unchanged since `0.3.3` |
 | `tenant_slug` | the tenant under audit (`seetrex-compliance` today — the only enrolled tenant since the 2026-08-24 reset) | the tenant's own chain-export name on the Trust Center (`<slug>-chain.json`) — a naming convention, not a security value |
 | `genesis_key_hash` | SHA-256 of the raw 32-byte Ed25519 GENESIS submit public key, generated on the producer host on 2026-08-24 (the genesis reset — it REPLACED the 2026-07-26 key, see the discontinuity note above); no rotation has occurred since (see 7.4c) | none outside the vendor — this is the producer's self-declared identity root, and pinning it IS the point: every anchored leaf must trace to it (via any published rotations) or CONSISTENCIA fails. Its only publication channel is this signed document |
 | `policy.log_pubkey` | the Ed25519 public key of the `seasalp.glasklar.is` Sigsum log | `https://www.sigsum.org/services/`; the Sigsum project's vetted policy `sigsum-generic-2025-1` (sigsum-go, `pkg/policy/builtin/`); Glasklar's own ops publication (`glasklar/services/sigsum-logs`, instance `seasalp.md`) |
@@ -1249,7 +1424,7 @@ subcommand rejects the argument, so its output would read as your mistake
 rather than as an answer to the question. Only (e.2) prints the
 `truncation reference:` line, so the flag and that line arrive together; if
 your binary has neither, (e.1) is your section, and upgrading to `0.3.4` is
-what moves you out of it. This revision of the kit is written against `0.3.4`.
+what moves you out of it. This revision of the kit is written against `0.3.5`.
 <!-- top-level-help-code:end -->
 
 *Do not read any of this as "inclusion in the log stops at ordinal 12."* It
@@ -1267,8 +1442,9 @@ no host access and no producer file but the chain export:
    `lo` plus its position in the batch;
 3. `GET https://seasalp.glasklar.is/get-inclusion-proof/<size>/<leaf_hash>`
    with `leaf_hash = SHA256(0x00 || checksum || signature || key_hash)` (RFC
-   6962 over the 128-byte Sigsum leaf), and fold the returned audit path (the
-   inclusion-proof section of RFC 9162) against the `root_hash` of
+   6962 over the 128-byte Sigsum leaf), and fold the returned audit path
+   (RFC 9162, Section 2.1.3 on Merkle inclusion proofs — its subsection on
+   VERIFYING one is the fold to run) against the `root_hash` of
    `GET https://seasalp.glasklar.is/get-tree-head`, whose log signature and
    witness cosignatures your kit's pinned `policy` authenticates.
 
@@ -1314,10 +1490,13 @@ stop and raise it: that is the shape of a submitter that has silently stopped,
 and it is indistinguishable from cadence in any single download.
 
 *What this section does NOT promise.* It records behaviour measured on
-2026-08-25 with the two builds named above. It announces no release, no change
-to the publication cadence, and nothing here is a reason to postpone the
-checks. If a later revision of this document reports a different outcome, that
-revision is the one to trust — and its date is the one to read.
+2026-08-25 and 2026-08-26 with the two builds named above. The release it names, `0.3.4`, was
+already published when this revision was written — the section REPORTS that
+release, it does not announce it — and past it this section promises nothing:
+no further release, no change to the publication cadence, and nothing here is a
+reason to postpone the checks. If a later revision of this document reports a
+different outcome, that revision is the one to trust — and its date is the one
+to read.
 <!-- anchor-lag-finding:end -->
 
 ---
@@ -1337,21 +1516,45 @@ genesis. The programs and their logic are unchanged; run against a fresh
 export they print a small row count that grows from 1. Dated records of real
 runs are left at the row count that produced them rather than restated.
 
-The pins below say `=0.3.3` while that capture was taken with `=0.3.0`, and the
-gap is stated rather than hidden. Across `0.3.0` through `0.3.3` every
+**Re-run on 2026-08-27 under the pin below, now `=0.3.4`.** The A.1 program
+was rebuilt from the two blocks printed here, unedited, against the freshly
+published release, and pointed at the live chain export of section 3. It
+compiled clean and printed `68 rows, ordinals contiguous from 1, every hash
+link recomputed OK` with head `cec0b14543ed…` — character for character the
+`last_chain_hash` the installed `0.3.4` executable printed for the same file
+in the same minute. That agreement, not our word for it, is the whole claim
+of this appendix.
+
+The pins below say `=0.3.4` while that capture was taken with `=0.3.0`, and the
+gap is stated rather than hidden. Across `0.3.0` through `0.3.4` every
 hash, exit code and comparison result THESE programs compute is identical.
-What `0.3.2` changed in the library was not behaviour but text (the shared
-`scope` module and two doc-comment corrections); what `0.3.3` adds is a whole
-new, ADDITIVE subsystem — anchor verification (`anchor.rs`, `merkle.rs`,
+**What is NOT true, and an earlier revision of this appendix said it was, is
+that only the executable's source differs between consecutive published
+crates.** It was already false at `0.3.3` and it is emphatically false at
+`0.3.4`. Measured on 2026-08-27 by unpacking both tarballs from
+`https://static.crates.io/crates/seetrex-verifier/` and running `diff -rq`:
+the `0.3.3` tarball holds 24 files and the `0.3.4` one 74; twelve files exist
+in both and differ (`Cargo.lock`, `Cargo.toml`, `Cargo.toml.orig`,
+`README.md`, `src/anchor_completitud.rs`, `src/anchor_package.rs`,
+`src/bin/seetrex-verifier.rs`, `src/chain_export.rs`, `src/lib.rs`,
+`src/package.rs`, `tests/bin_e2e.rs` and one test fixture), and seven paths
+are new in `0.3.4` alone — among them the whole `src/sbom/` module (seven
+files), an `examples/` directory and three added test suites. So expect a
+`src/` diff between any two of these releases to show far more than the
+`bin/` file; what it will NOT show is a change to the code these programs
+call. What `0.3.2` changed in the library was not behaviour but text (the
+shared `scope` module and two doc-comment corrections); `0.3.3` added the
+ADDITIVE anchor-verification subsystem (`anchor.rs`, `merkle.rs`,
 `checkpoint.rs`, `anchor_completitud.rs`, `anchor_package.rs`, a
-`chain_export.rs` addition and the `verify-anchor` CLI arm) — so a `src/`
-diff between `0.3.2` and `0.3.3` shows far more than the executable; none of
-it touches what `verify-chain`, `verify-package` or the appendix programs
-compute. Pin `=0.3.0`, `=0.3.1`, `=0.3.2` or `=0.3.3` and these programs
+`chain_export.rs` addition and the `verify-anchor` CLI arm) and `0.3.4` the
+equally additive SBOM projection (`src/sbom/`, two CLI arms and the optional
+`--chain` input of 7.4(e)); none of it touches what `verify-chain`,
+`verify-package` or the appendix programs compute. Pin `=0.3.0`, `=0.3.1`,
+`=0.3.2`, `=0.3.3` or `=0.3.4` and these programs
 compute identically. Do not take that on our word: unpack the crates
 and diff `src/`, normalising line endings first when `0.3.1` is involved
-(`0.3.1` alone shipped CRLF; `0.3.0`, `0.3.2` and `0.3.3` are LF), or the
-diff will mark every file as changed and you will have learned nothing.
+(`0.3.1` alone shipped CRLF; `0.3.0`, `0.3.2`, `0.3.3` and `0.3.4` are LF), or
+the diff will mark every file as changed and you will have learned nothing.
 
 ### A.1 Chain export check (reimplements section 3)
 
@@ -1364,7 +1567,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-seetrex-verifier = "=0.3.3"
+seetrex-verifier = "=0.3.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ```
@@ -1513,4 +1716,4 @@ fn main() {
 }
 ```
 
-`Cargo.toml` dependencies: `seetrex-verifier = "=0.3.3"` only.
+`Cargo.toml` dependencies: `seetrex-verifier = "=0.3.4"` only.

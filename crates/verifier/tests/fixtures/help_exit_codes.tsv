@@ -26,7 +26,7 @@
 # vendored description of the PUBLISHED tool, covers `<subcommand> --help` only
 # and carries no `--help` row — one there is refused by name, because every
 # non-`version` key in that file is taken for a subcommand.
-# Measured 2026-08-26 on the tree released as seetrex-verifier 0.3.4.
+# Measured 2026-08-26 on a tree whose CLI is unchanged in the release seetrex-verifier 0.3.5.
 --help	0
 verify-anchor	2
 verify-chain	1
