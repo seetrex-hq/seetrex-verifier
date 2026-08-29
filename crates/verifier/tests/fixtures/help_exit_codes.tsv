@@ -26,7 +26,10 @@
 # vendored description of the PUBLISHED tool, covers `<subcommand> --help` only
 # and carries no `--help` row — one there is refused by name, because every
 # non-`version` key in that file is taken for a subcommand.
-# Measured 2026-08-26 on a tree whose CLI is unchanged in the release seetrex-verifier 0.3.5.
+# Measured in this tree by bin_e2e, which spawns the built executable once per
+# row. All six rows were also re-observed 2026-08-29 against the PUBLISHED
+# seetrex-verifier 0.3.5, installed from crates.io into an empty root: every
+# value below is identical in the published tool and in this tree.
 --help	0
 verify-anchor	2
 verify-chain	1

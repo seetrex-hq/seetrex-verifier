@@ -17,6 +17,42 @@ entry's release date is the date of its signed tag.
 Nothing is released here yet. What follows is what this tree holds and no
 signed tag carries.
 
+### Fixed
+- CHANGELOG: the `0.3.5` entry below says the `.crate` published as `0.3.4`
+  "still carries the wrong sentence" and that an auditor reads this file
+  "inside that tarball". Measured against the tarballs crates.io serves, that
+  is false: neither the `0.3.4` nor the `0.3.5` `.crate` contains this file at
+  all (74 files each; the crate is packaged from a tree where this file has
+  already been moved to the repository root). This file is published in the
+  root of the public repository under each signed tag, and nowhere else; the
+  `0.3.4` sentence about exit codes was therefore wrong in that place, never
+  on crates.io. The `README.md` remark in the same entry is correct: that file
+  does travel inside the `.crate`.
+- `tests/fixtures/fb2c_enumeration_oracle.json` shipped with CRLF line
+  endings in the `0.3.5` `.crate` and in the public tree at its tag - the only
+  file of the 74 with a carriage return; every other file, and every file of
+  `0.3.4`, is LF. The committed file was LF all along: the carriage returns
+  came from the working copy of the machine that ran the export, which copies
+  working files rather than committed blobs. The content is JSON, so nothing
+  that reads it changes. The export path is what has to change; until it
+  does, a release can carry the same defect again.
+- CHANGELOG: the `0.3.5` entry below enumerates the files of this crate that
+  differ from the `0.3.4` tag as five and names this file among them. Both
+  halves of that list are wrong. This file does not live inside
+  `crates/verifier` - it sits at the root of the public repository - so it
+  cannot be one of that crate's differing files; and the entry omits
+  `tests/fixtures/fb2c_enumeration_oracle.json`, which does differ. Measured
+  in a fresh clone of the public repository with `git diff --name-only
+  seetrex-verifier-v0.3.4 seetrex-verifier-v0.3.5 -- crates/verifier`, the
+  list is exactly five paths, but not those five: `Cargo.toml`, `README.md`,
+  `tests/bin_e2e.rs`, `tests/fixtures/fb2c_enumeration_oracle.json` and
+  `tests/fixtures/help_exit_codes.tsv`. The scope of that count is the public
+  repository TREE at the two signed tags. Comparing the two `.crate` tarballs
+  instead is a different measurement with a different answer - the auditor
+  kit's Appendix A reports seven differing files there, the same five plus
+  `Cargo.lock` and `Cargo.toml.orig`, and neither tarball carries this file at
+  all.
+
 ## [seetrex-verifier 0.3.5] — 2026-08-28
 
 Test-harness scaffolding, plus two corrections to the documents that travel

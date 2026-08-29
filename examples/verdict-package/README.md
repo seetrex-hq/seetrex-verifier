@@ -39,7 +39,7 @@ Install the verifier first (see the repository README or
 [`docs/AUDITOR_KIT.md`](../../docs/AUDITOR_KIT.md)):
 
 ```
-$ cargo install seetrex-verifier --locked --version 0.3.4
+$ cargo install seetrex-verifier --locked --version 0.3.5
 ```
 
 **Without an external anchor** — internal consistency only:
@@ -55,9 +55,9 @@ Exit code `4`. This is deliberately *not* a verification: a coherent forgery is
 self-consistent by construction. The package can never be its own trust root.
 
 **With the anchor taken from the chain export** — the way an auditor works.
-The transcript below was re-captured on 2026-08-27 with the `0.3.4`
+The transcript below was re-captured on 2026-08-29 with the `0.3.5`
 executable installed by the command above, run against the files in this
-directory; it is byte-identical to the `0.3.3` capture it replaces:
+directory; it is byte-identical to the `0.3.4` capture it replaces:
 
 ```
 $ seetrex-verifier verify-chain examples/verdict-package/example-audit-tenant-chain.json
