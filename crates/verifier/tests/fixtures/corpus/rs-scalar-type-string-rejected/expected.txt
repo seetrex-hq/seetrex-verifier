@@ -1,0 +1,5 @@
+token=
+exit=1
+class=FAIL
+# spec: 6.1 Document completion rules
+# gap: SPEC-GAP-Q7

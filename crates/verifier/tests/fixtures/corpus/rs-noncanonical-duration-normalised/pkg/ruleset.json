@@ -1,0 +1,1 @@
+{"article":"1","control":"ctl","doc":"d","engine_semantic_version_floor":1,"facts_consumed":["age"],"framework":"CRA","rules":[{"conditions":[{"fact_id":"age","operator":"Gt","value":"90m"}],"consequent":"c","id":"r1","name":"n","priority":1}],"ruleset_id":"rs","verdicts_emitted":["SATISFIED"],"version":1}

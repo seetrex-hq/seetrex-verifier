@@ -1,0 +1,10 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 4.1 Type inference precedence
+# note: 4.1 Date-time: the numeric offset's magnitude MUST be strictly below 24:00.
+# note: `+24:00` is out of range, so the string is not a date-time and reaches String,
+# note: hashing verbatim -- an implementation that normalises it to
+# note: `2026-07-17T12:00:00Z` produces a different hash for the same package.
+# note: Derived from the sentence before either binary was run.
+# gap: SPEC-GAP-4.1-datetime-2

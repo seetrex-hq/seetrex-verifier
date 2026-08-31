@@ -1,0 +1,22 @@
+{
+  "control_id": "sbom_presence",
+  "engine_semantic_version": 6,
+  "evidence_refs": [
+    {
+      "content_hash": "b0cbaec4eb37028beb657057ecaf50f58d1364f3b6064d9faa3888e2b77bc980",
+      "evidence_id": "762e8074-96f5-4764-aa59-aa3c6fb92a7e"
+    }
+  ],
+  "id": "cf26f538-cc98-4ac1-8591-7caba28e8f03",
+  "inferred_at": "2026-07-20T12:51:12.923399Z",
+  "preimage_version": 2,
+  "ruleset_content_hash": "7085ea83389ec8511b38d51d43945c2efde75ab5f9dbcff4146696d327cc15b3",
+  "ruleset_id": "sprint1-sbom-presence",
+  "ruleset_version": 1,
+  "tenant_id": "f9b8de44-3906-4d5c-96b9-67de044f659c",
+  "verdict_hash": "93bcd10fd82ae721c478130b35c2c2c9030cbe2dec02e0c495254f7cbee1af69",
+  "verdict_outcome": "SATISFIED",
+  "working_memory_canonical": {
+    "sprint1.verdict_SATISFIED": "SATISFIED"
+  }
+}

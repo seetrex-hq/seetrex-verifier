@@ -8,7 +8,7 @@ name = "seetrex-verifier"
 # CLI binary (0.2.0 was library-only, so `cargo install` had nothing to
 # install — an external auditor could not obtain an executable tool from
 # public material).
-version = "0.3.5"
+version = "0.3.6"
 edition.workspace = true
 # Per-crate Apache-2.0 override — this crate is OPEN; the workspace
 # default stays PROPRIETARY and is NOT changed. Full text in ./LICENSE;
@@ -16,6 +16,15 @@ edition.workspace = true
 license = "Apache-2.0"
 description = "Pure offline verification core for Seetrex Compliance verdict packages (hash integrity, chain, ruleset anchor)"
 repository = "https://github.com/seetrex-hq/seetrex-verifier"
+# The Python reference of route E is COMPILED by the interpreter the moment a
+# test runs it, and the staging tree of `scripts/export_public.sh` runs it in
+# phase 4 -- after the phase 3 marker scan. Without this, `cargo package` from
+# that staging tree packs `reference/__pycache__/*.pyc`: a machine-specific
+# build artifact, inside an immutable release. Measured on the 0.3.6 export
+# (622 entries, one of them the `.pyc`). The public REPOSITORY push has the
+# same exposure and this key does not govern it -- the release checklist
+# deletes the directory before the overlay.
+exclude = ["**/__pycache__"]
 
 # The auditor-facing CLI. Declared EXPLICITLY (not left to src/bin
 # autodiscovery) so the existence of an installable binary is a pinned,
@@ -50,8 +59,37 @@ sha2 = { workspace = true }
 # guard (`test_intent_verifier_crate_dependency_purity`).
 ed25519-dalek = { version = "2", default-features = false }
 thiserror = { workspace = true }
-chrono = { workspace = true }
-uuid = { workspace = true }
+# NOT `{ workspace = true }`: the workspace set keeps chrono's DEFAULT
+# features, whose `clock` pulls `wasmbind` -> `js-sys` + `wasm-bindgen`. On
+# `wasm32-unknown-unknown` that leaves `__wbindgen_placeholder__` imports in
+# the module, so `WebAssembly.instantiate(bytes, {})` dies with a LinkError --
+# an offline page that cannot start. This crate never calls `Utc::now()` (only
+# a doc comment mentions it, `src/canonical.rs:99`); it parses and formats
+# timestamps, which is `std` + `serde` only. The `=` pin is kept VERBATIM so
+# the kit's "Build toolchain" row and `scripts/export_public.sh`'s verbatim
+# workspace-line check stay true.
+#
+# Measured (T-T11-1), and load-bearing for whoever reads this next: this line
+# alone is NECESSARY BUT NOT SUFFICIENT. `seetrex-format` -- a dependency of
+# this crate, FROZEN at 1.0.0 -- also declares `chrono = { workspace = true }`
+# (`crates/format/Cargo.toml:28`), and feature unification re-enables `clock`
+# -> `wasmbind` from there. With only this line the module still imports 4
+# symbols (`__wbindgen_placeholder__::{__wbindgen_describe,__wbindgen_throw}`,
+# `__wbindgen_externref_xform__::{...table_grow,...table_set_null}`) and
+# weighs 339 690 bytes. With the SAME subtraction applied to `seetrex-format`
+# too, the import set is EMPTY and the module weighs 181 622 bytes. That
+# second edit touches a frozen crate and is FOUNDER-GATED (spec 3.2, plan 3):
+# it is NOT taken here.
+chrono = { version = "=0.4.41", default-features = false, features = ["std", "serde"] }
+# NOT `{ workspace = true }`: the workspace set enables `v4`, which pulls
+# `uuid`'s `rng` module, and on `wasm32-unknown-unknown` that module is a
+# `compile_error!` demanding a randomness source (`uuid-1.17.0/src/rng.rs:104`).
+# This crate only uses `Uuid::nil`, `Uuid::parse_str`, `Deserialize` and
+# `BTreeMap<Uuid, _>` keys -- it never GENERATES an id -- so `v4` is dead
+# weight natively and a hard build stop for the browser route (T11).
+# Subtracting it is behaviour-neutral for the corpus and removes `getrandom`
+# from what `cargo install seetrex-verifier` compiles.
+uuid = { version = "1", default-features = false, features = ["std", "serde"] }
 hex = { workspace = true }
 rust_decimal = { workspace = true }
 

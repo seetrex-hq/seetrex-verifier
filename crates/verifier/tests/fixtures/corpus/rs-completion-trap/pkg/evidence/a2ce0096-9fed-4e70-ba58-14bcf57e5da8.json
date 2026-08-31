@@ -1,0 +1,14 @@
+{
+  "canonical_blob_key": null,
+  "canonical_blob_size_bytes": null,
+  "canonical_inline": "{\"bomFormat\":\"CycloneDX\",\"components\":[{\"name\":\"fixture-component\",\"purl\":\"pkg:cargo/fixture-component@0.0.1\",\"type\":\"library\",\"version\":\"0.0.1\"}],\"specVersion\":\"1.5\",\"version\":1}",
+  "canonical_kind": "inline",
+  "category": "sbom",
+  "contains_pii_flag": false,
+  "content_hash": "f5c09386daa98920123f845a0ebd148d76d4b97e5f727a1fb433bf078f2fd110",
+  "derived_facts": [],
+  "id": "a2ce0096-9fed-4e70-ba58-14bcf57e5da8",
+  "ingested_at": "2026-07-17T22:59:28.665228+00:00",
+  "source_id": "github.repo_sbom.v1",
+  "tenant_id": "5ee70000-0000-0000-0000-000000000f1c"
+}

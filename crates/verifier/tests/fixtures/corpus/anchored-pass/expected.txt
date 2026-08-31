@@ -1,0 +1,4 @@
+token=INTEGRITY-OK (weak)
+exit=0
+class=PASS
+# spec: 9.6 Package integrity verification (`verify-package`)

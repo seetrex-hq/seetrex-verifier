@@ -1,0 +1,5 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 3.3 `evidence/<uuid>.json`
+# gap: SPEC-GAP-Q5

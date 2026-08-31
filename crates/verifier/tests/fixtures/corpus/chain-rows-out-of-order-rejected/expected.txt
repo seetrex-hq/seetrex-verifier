@@ -1,0 +1,5 @@
+token=
+exit=1
+class=FAIL
+# spec: 8.1 The public chain export
+# gap: SPEC-GAP-Q14

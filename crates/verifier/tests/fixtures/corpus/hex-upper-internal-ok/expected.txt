@@ -1,0 +1,5 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 2. Conventions and primitives
+# gap: SPEC-GAP-Q3

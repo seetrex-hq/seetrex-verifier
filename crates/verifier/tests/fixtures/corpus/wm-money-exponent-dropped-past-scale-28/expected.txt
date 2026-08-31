@@ -1,0 +1,12 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 4.1 Type inference precedence
+# note: 4.1 Money, exponent form with MORE than 28 fractional digits in the
+# note: mantissa: the mantissa is rounded by the exponent-free rule and the
+# note: exponent is then DISCARDED. `1.99999999999999999999999999999e1` has 29
+# note: fractional digits, so it recovers as `2` and NOT as `20`.
+# note: An implementation that folds the exponent first hashes this package
+# note: differently and exits 1.
+# note: Derived from the sentence, not from either binary's output.
+# gap: SPEC-GAP-4.1-money-2

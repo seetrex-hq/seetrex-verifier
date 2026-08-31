@@ -1,0 +1,4 @@
+token=
+exit=1
+class=FAIL
+# spec: 7.4 The `preimage_version` discriminator

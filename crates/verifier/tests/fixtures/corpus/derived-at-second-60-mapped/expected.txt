@@ -1,0 +1,6 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 7.3 `derived_at`: the name mapping and the format rule
+# gap: SPEC-GAP-Q10
+# gap: SPEC-GAP-7.3-LEAP

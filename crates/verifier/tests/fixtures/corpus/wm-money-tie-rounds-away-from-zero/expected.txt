@@ -1,0 +1,10 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 4.1 Type inference precedence
+# note: 4.1 Money, no exponent: fractional digits beyond scale 28 are rounded once,
+# note: half AWAY FROM ZERO. The 29th digit is an exact tie, so it rounds up:
+# note: `1.00000000000000000000000000005` -> `1.0000000000000000000000000001`.
+# note: Half-to-even would give `1` -- that is the divergence this case pins.
+# note: Derived from the sentence before either binary was run.
+# gap: SPEC-GAP-4.1-money-2

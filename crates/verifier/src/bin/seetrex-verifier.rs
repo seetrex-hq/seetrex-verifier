@@ -92,9 +92,12 @@ use seetrex_verifier::anchor_package::{
 };
 use seetrex_verifier::anchor_completitud::TruncationReference;
 use seetrex_verifier::chain_export::parse_and_verify_package;
+use seetrex_verifier::cli_render::{
+    cap_refusal, chain_export_text, render_chain_read_failure, render_verify_chain,
+    render_verify_package, CommandOutput, CHAIN_EXPORT_MAX_BYTES,
+};
 use seetrex_verifier::package::{
     sanitize_reserved_token as redact, verify_package, RESERVED_TOKEN_LEGEND, RESERVED_TOKEN_MASK,
-    SCOPE_STATEMENT,
 };
 use seetrex_verifier::sbom::compare::{CompareError, Verdict as SbomVerdict};
 use seetrex_verifier::sbom::depv0::DepV0Error;
@@ -103,10 +106,10 @@ use seetrex_verifier::sbom::{
     Projection, SbomError, SubjectPurl,
 };
 
-/// Read cap for the chain export file (DoS guard). A real chain export
-/// is a few hundred bytes per row; 50 MiB is far beyond any legitimate
-/// export without being unbounded.
-const CHAIN_FILE_MAX_BYTES: u64 = 50 * 1024 * 1024;
+/// Read cap for the chain export file (DoS guard), as the library spells
+/// it: the offline browser page applies the SAME number to the bytes it
+/// read out of the dropped file, so the two surfaces refuse the same export.
+const CHAIN_FILE_MAX_BYTES: u64 = CHAIN_EXPORT_MAX_BYTES;
 
 const HELP: &str = "\
 seetrex-verifier — offline verification of Seetrex Compliance verdict
@@ -298,43 +301,31 @@ fn cmd_verify_package(rest: &[String]) -> ExitCode {
         return ExitCode::from(2);
     };
 
-    match verify_package(Path::new(package_dir), expected.as_deref()) {
-        Ok(report) => {
-            for step in &report.steps {
-                println!("{}", sanitize_reserved_token(step));
-            }
-            for w in &report.warnings {
-                println!("{}", sanitize_reserved_token(&format!("WARNING: {w}")));
-            }
-            if report.anchored {
-                // Weak pass token (anchored) — binding per §9.6.
-                println!("{}", sanitize_reserved_token("INTEGRITY-OK (weak)"));
-                println!("{}", sanitize_reserved_token(SCOPE_STATEMENT));
-                ExitCode::SUCCESS
-            } else {
-                println!("{}", sanitize_reserved_token("SELF-CONSISTENT (unanchored)"));
-                println!("{}", sanitize_reserved_token(SCOPE_STATEMENT));
-                println!(
-                    "{}",
-                    sanitize_reserved_token(
-                        "HINT: pass --expected-verdict-hash <hex> (obtained \
-                         from the published chain export or another external \
-                         channel) to upgrade this to INTEGRITY-OK (weak) — \
-                         the package can never be its own trust root."
-                    )
-                );
-                // Exit 4 — an unanchored pass is NOT a verification (§9.6).
-                ExitCode::from(4)
-            }
-        }
-        Err(e) => {
-            eprintln!("{}", sanitize_reserved_token(&format!("ERROR: {e}")));
-            // The honest-scope statement prints on EVERY terminal outcome,
-            // failure included (§9.6).
-            eprintln!("{}", sanitize_reserved_token(SCOPE_STATEMENT));
-            ExitCode::from(1)
-        }
+    emit(render_verify_package(verify_package(
+        Path::new(package_dir),
+        expected.as_deref(),
+    )))
+}
+
+/// The binary's stream boundary for the two subcommands the offline page
+/// also answers.
+///
+/// The lines are composed by `seetrex_verifier::cli_render` -- already
+/// sanitized, already ordered -- so this function only chooses the STREAM
+/// and remembers whether the mask reached the screen. The legend condition
+/// is the same one [`sanitize_reserved_token`] applies elsewhere: the text
+/// CARRIES the mask, not "this process replaced something".
+fn emit(out: CommandOutput) -> ExitCode {
+    if out.mask_used {
+        RESERVED_TOKEN_MASK_PRINTED.store(true, Ordering::Relaxed);
     }
+    for line in &out.stdout {
+        println!("{line}");
+    }
+    for line in &out.stderr {
+        eprintln!("{line}");
+    }
+    ExitCode::from(out.exit)
 }
 
 /// `verify-chain <file.json>` — thin wrapper over the pure
@@ -353,49 +344,14 @@ fn cmd_verify_chain(rest: &[String]) -> ExitCode {
         Ok(raw) => raw,
         Err(detail) => {
             // The filename comes from argv — attacker-influenced in
-            // scripted pipelines; sanitize it like every other
-            // non-fixed string.
-            eprintln!(
-                "ERROR: cannot read {}: {}",
-                sanitize_reserved_token(file),
-                sanitize_reserved_token(&detail)
-            );
-            return ExitCode::from(1);
+            // scripted pipelines; sanitize it like every other non-fixed
+            // string. The line is composed by `cli_render`, which is what
+            // makes the browser page able to say it too.
+            return emit(render_chain_read_failure(file, &detail));
         }
     };
 
-    match parse_and_verify_package(&raw) {
-        Ok(head) => {
-            println!("Public chain package VERIFIED OFFLINE");
-            println!("  verdict_count:   {}", head.verdict_count);
-            println!("  last_chain_hash: {}", head.last_chain_hash);
-            println!();
-            // SCOPE, stated at the same volume as the banner. The link
-            // preimage covers only `verdict_hash`, `chain_prev_hash` and
-            // `chain_hash`; the human-readable columns of the export are
-            // NOT inputs to it, so editing them leaves every link — and
-            // this head hash — intact. Two of the four (verdict_outcome,
-            // ruleset_id) are committed inside the verdict's own hash,
-            // recomputable only from its package; the other two
-            // (appended_at, verdict_id) are committed nowhere — no artifact
-            // we publish binds them. Saying "tamper-evidence of the observed
-            // history" here was an overclaim: an external evaluator rewrote
-            // the head row's outcome, ruleset id and timestamp and still got
-            // this banner with the vendor's exact published head hash.
-            println!(
-                "Compare these two values against the vendor's public Trust \
-                 Center page for this tenant. {}",
-                seetrex_verifier::scope::SCOPE_LINK_CLAIM
-            );
-            println!();
-            println!("{}", seetrex_verifier::scope::SCOPE_NOT_COVERED);
-            ExitCode::SUCCESS
-        }
-        Err(e) => {
-            eprintln!("{}", sanitize_reserved_token(&format!("ERROR: {e}")));
-            ExitCode::from(1)
-        }
-    }
+    emit(render_verify_chain(parse_and_verify_package(&raw)))
 }
 
 /// `verify-anchor <anchor.json> --kit <kit.json>` — thin shell over
@@ -1759,7 +1715,7 @@ fn read_capped_bytes(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
     let f = std::fs::File::open(path).map_err(|e| e.to_string())?;
     let meta = f.metadata().map_err(|e| e.to_string())?;
     if meta.len() > cap {
-        return Err(format!("{} bytes exceeds the {cap} byte cap", meta.len()));
+        return Err(cap_refusal(meta.len(), cap));
     }
     let mut buf = Vec::with_capacity(meta.len() as usize);
     f.take(cap + 1)
@@ -1772,9 +1728,13 @@ fn read_capped_bytes(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
 }
 
 /// [`read_capped_bytes`] at an explicit cap, requiring UTF-8.
+///
+/// The cap and the UTF-8 gate are `cli_render::chain_export_text`, the ONE
+/// spelling the browser page applies to the bytes it read: an export this
+/// refuses must not verify there.
 fn read_capped_utf8_at(path: &Path, cap: u64) -> Result<String, String> {
     let buf = read_capped_bytes(path, cap)?;
-    String::from_utf8(buf).map_err(|e| format!("not valid UTF-8: {e}"))
+    chain_export_text(buf, cap)
 }
 
 /// The chain-export read: [`read_capped_utf8_at`] at the export's own cap.

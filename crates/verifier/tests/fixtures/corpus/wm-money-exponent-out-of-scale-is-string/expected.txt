@@ -1,0 +1,10 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 4.1 Type inference precedence
+# note: 4.1 Money, WITH an exponent: the value must fit exactly once the exponent is
+# note: folded into the scale; nothing is rounded. Folded scale 29 > 28, so `1e-29` is
+# note: not a monetary value and reaches String, hashing verbatim -- unlike the
+# note: no-exponent case above, which rounds. Derived from the sentence before either
+# note: binary was run.
+# gap: SPEC-GAP-4.1-money-2

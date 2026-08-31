@@ -1,0 +1,4 @@
+token=
+exit=1
+class=FAIL
+# spec: 9.3 The external trust anchor (normative for §9.1 and §9.2, and for §9.6's anchored outcome)

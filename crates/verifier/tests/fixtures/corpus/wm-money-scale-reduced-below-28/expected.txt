@@ -1,0 +1,13 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 4.1 Type inference precedence
+# note: 4.1 Money, no exponent: the candidate scale starts at min(f, 28) and is
+# note: DECREMENTED while the mantissa is not strictly below 2^96, rounding again
+# note: from the original digits each time. `9.9999999999999999999999999999` has
+# note: f = 28, but mantissa 99999999999999999999999999999 is above 2^96, so the
+# note: scale drops to 27 and the value rounds (half away from zero) to `10`.
+# note: An implementation that stopped at scale 28 -- or that rejected the value
+# note: for not fitting -- hashes this package differently and exits 1.
+# note: Derived from the sentence, not from either binary's output.
+# gap: SPEC-GAP-4.1-money-2

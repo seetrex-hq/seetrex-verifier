@@ -14,10 +14,272 @@ entry's release date is the date of its signed tag.
 
 ## [Unreleased]
 
-Nothing is released here yet. What follows is what this tree holds and no
-signed tag carries.
+### Added
+- `package::PackageSource`, `package::PackageFiles` and
+  `package::verify_package_files`: package integrity verification can now be
+  driven from bytes already in memory, for a host that has no filesystem.
+  `verify_package(&Path, …)` keeps its signature and becomes a one-line wrapper
+  over the same seven steps, reading in the same order, with the same tokens
+  and the same exit codes.
+
+  Two separate things are measured, because a shipped binary has only ONE arm
+  and no run of it can compare two:
+  - **the binary did not move.** For the 83 corpus packages under
+    `tests/fixtures/corpus/*/pkg/`, the `verify-package` stdout, stderr and
+    exit code of the binary built from this tree are byte-identical to those
+    of the binary built from the commit before the seam. The `Dir` arm is the
+    only arm the CLI has, and it is unchanged.
+  - **the two arms answer alike.** An in-crate test loads each of those same
+    83 packages into a `PackageFiles` and compares `verify_package(dir)` with
+    `verify_package_files(&files)`: equal steps, warnings, recomputed verdict
+    hash and anchoring on success, the same error VARIANT on failure, and the
+    same exit class either way. A second test does the same for the package
+    shapes no corpus case has — a nested evidence tree, an EMPTY directory
+    under `evidence/`, an empty directory at the package root, a core file
+    absent, a manifest entry naming a directory, an oversized file no step
+    reads.
+
+  The two arms always agree on the error VARIANT and on the exit code. They do
+  not always agree on the WORDING, and the differences are declared:
+  - a file the steps read and cannot find is `Io` on both, but the `Dir` arm
+    quotes the operating system (`… (os error 2)`) where the in-memory arm
+    writes `no such file in the package`;
+  - an entry that names a DIRECTORY is unreadable on both, and the in-memory
+    arm says so in its own words (`is a directory, not a file in the package`)
+    because there is no operating system to quote;
+  - on Windows, the on-disk path an `Io`/`Malformed` message renders is now
+    spelled with the platform separator throughout (`…\pkg\evidence\x.json`);
+    steps 2 and 5 previously rendered the relative part verbatim
+    (`…\pkg\evidence/x.json`) while step 3 did not. POSIX is unaffected.
+
+  The in-memory arm cannot make step 1's symlink refusal: a host without a
+  filesystem cannot report a symlink. Only the 8192-file cardinality cap moves
+  to `PackageFiles::insert` (same value, same error value, an earlier point);
+  the 10 MiB per-file cap stays where the reads are, on BOTH arms, so a package
+  that merely LISTS an oversized file the seven steps never open is accepted by
+  both instead of being a pass on disk and a refusal in memory.
+
+  Two obligations fall on whatever BUILDS a `PackageFiles`, and neither can be
+  discharged inside this crate:
+  - **directories must be recorded**, `PackageFiles::insert_dir` for every one
+    walked, EMPTY ones included. A directory is not a key: a map built from
+    files alone can infer the directories that nest something, but not an
+    empty `evidence/empty_sub/`, which `read_dir` sees and which the `Dir` arm
+    refuses at step 3. A browser directory drop enumerates empty directories,
+    so a loader that ignores them turns a refusal into a pass. Keys themselves
+    are validated on the way in: `""`, `"evidence/"`, `"evidence//b.json"`,
+    a backslash, a `.` or `..` component, or a name given as both a file and a
+    directory are refused (`Shape`) rather than stored as something no
+    directory walk could ever emit.
+  - **total bytes must be bounded before the map is built.** Neither cap
+    bounds a package's total size — 8192 files of 10 MiB is 80 GiB on the
+    `Dir` arm too — and adding such a bound to the in-memory arm alone would
+    be a divergence, not a shared limit. By the time `insert` is called the
+    bytes are already allocated in the host's memory.
+- A signed release may now carry an OFFLINE BROWSER PAGE,
+  `seetrex-verifier-offline.html`: one self-contained HTML file with a
+  `wasm32-unknown-unknown` build of this same library embedded in it, opened
+  from disk with the network off. It answers `verify-package` and
+  `verify-chain` only — `verify-anchor`, `emit-sbom` and `verify-sbom` have no
+  browser leg — and it prints this crate's own lines and outcome tokens, with
+  no second vocabulary of its own. It makes no network request of any kind,
+  which is checked as a property of the file's text; it cannot refuse a
+  symlinked package member the way the executable does (the declared limit of
+  the in-memory arm above); and it is built from the vendor's tree rather than
+  from the signed tag, so what binds it to that tag is a version
+  correspondence, not byte identity. Route F of `docs/AUDITOR_KIT.md`, section
+  2.6, is the whole of it — how to obtain it, the two commands that check it,
+  and where its limits are. A release may carry it or not.
+- The release job that builds it (`release-verifier-web`) builds the page
+  TWICE and compares the bytes, answers it against the 92-case conformance
+  corpus through the very payload the shipped file carries, and only then
+  hashes it into a `SHA256SUMS` GPG-signed as `SHA256SUMS.asc` under the same
+  release-signing key as the prebuilt executables. Publication is a separate,
+  explicit act: the dispatch defaults to a dry run.
+
+## [seetrex-verifier 0.3.6] — 2026-08-30
+
+RUST-BUG-02, and the second implementation that found it. The published `0.3.4`
+and `0.3.5` `.crate`s carry a `Cargo.lock` resolving `rust_decimal` 1.42.1
+(their tree in the public repository does too, because the export regenerates
+the lockfile), while the Money canonicalization of section 4.1 of
+`SPEC_VERDICT_PACKAGE_V1.md` is a transcription of `rust_decimal` 1.37.2 -
+the version the production emitter computes with. The two disagree on three
+exponent-form monetary values (`1.5e-28`, `0.5e-28`, `1.0e-28`), which is a
+different verdict hash for the same package, so the published verifier could
+contradict the emitter on input neither of them is wrong about. The version is
+now pinned exactly in the workspace, together with `chrono` `=0.4.41`, and this
+is the first release whose lockfile resolves what the specification was
+measured against. No command, format or exit code moves.
+
+The release also ships, inside the crate, the Python reference implementation
+that made the divergence visible, the 92-case conformance corpus and the
+528-value differential grammar probe, and it carries the specification
+clarifications of 2026-08-30 that those two instruments forced.
+
+### Known limits
+- RUST-BUG-01 is NOT fixed here and `crates/format` is untouched: a duration
+  whose summed seconds exceed `i64::MAX / 1000` (while still fitting `i64`)
+  PANICS with exit 101 instead of falling through to `String`. It is a
+  declared reference limit - section 4.1 of the specification names the crash
+  band, and `tests/grammar_probe.rs` records a panic inside it as
+  `KNOWN_REFERENCE_DEFECT` and a panic outside it as a failure. It is carried
+  as version-bump debt of the reference implementation, not as a fix owed to
+  this release.
+
+### Added
+- `reference/seetrex_verifier.py`: a second implementation of the package
+  format, in Python 3.9+ with the standard library alone (RFC 8785 JCS
+  included), written from `docs/SPEC_VERDICT_PACKAGE_V1.md` and nothing else.
+  It offers `verify-package` and `verify-chain` in the CLI shape the
+  specification writes (`--package-dir`, `--chain-export`), which is NOT the
+  positional shape of the shipped executable. Route E of the auditor kit
+  documents it. Its `OPEN_QUESTIONS.md`, `BLIND_TRANSCRIPT.md`, `SELFTEST.md`
+  and `ALIGNMENT_NOTES.md` sit beside it.
+- `tests/fixtures/corpus/`: one conformance case per directory (see the corpus
+  directory for the current count), each a `cmd.txt` and an
+  `expected.txt` whose answer is derived from the specification by hand and
+  generated by neither implementation, so a disagreement can indict either
+  one. The directory carries `* -text` so a checkout never rewrites a fixture
+  byte.
+- `tests/corpus_equivalence.rs` and `reference/run_corpus.py`: the two legs
+  that answer the same corpus. Both run in CI on every push that touches the
+  specification, the reference, the corpus or either runner, and nightly.
+- `tests/fixtures/grammar_probes.txt`, `tests/grammar_probe.rs` and
+  `reference/run_grammar_probes.py`: the differential GRAMMAR PROBE. One JSON
+  scalar per line covering the boundaries of every value grammar of section
+  4.1; both implementations canonicalize each one as a single working-memory
+  entry and the answers are compared PER VALUE, so a divergence names the
+  input. Where the corpus answers the cases somebody wrote down, this answers
+  the values nobody thought of. Same CI job, same nightly.
+
+### Changed
+Sixteen points the independent implementation could not settle from the
+specification were clarified in it, plus one contradiction it exposed. No hash,
+token or exit code of this crate moves; what changes is what the document
+obliges a verifier to do.
+- DIV-01, sections 4 and 7.1: recomputation recovers every
+  `working_memory_canonical` value through the section 4.1 type inference and
+  re-serializes it in its section 4 canonical form before JCS; canonicalizing
+  the stored JSON verbatim is not conformant.
+- Q1, section 8.1: `verify-chain` exits `0` when every link recomputes and `1`
+  on any failure; there is no counterpart to the `4` of section 9.6.
+- Q2, section 9.6: the terminal outcome token is printed after the warning
+  block and before the honest-scope statement, and is matched as a line.
+- Q3, section 2: uppercase hex is accepted in package-internal comparisons,
+  never in a hash preimage.
+- Q4, section 3.1: only `verdict_id`, `verdict_hash`, `chain_hash` and `files`
+  are load-bearing; other manifest fields may be absent and unknown keys are
+  ignored.
+- Q5, section 3.3: an evidence record's identity is its `id` field, not its
+  filename.
+- Q6, section 3.2: the key sets of `verdict.json` and of the evidence files are
+  OPEN, unlike the ruleset's; unknown keys are ignored and bound by no hash
+  unless `files_sha256` is present.
+- Q7, section 6.1: the Type column is normative -- a scalar whose JSON type
+  does not match it is malformed and is rejected, not canonicalized.
+- Q8, section 6.1: a non-canonical ruleset FACT value is recovered and
+  re-serialized in canonical form before the completed document is
+  canonicalized; the ruleset's plain string fields are carried verbatim.
+- Q9, section 9.6 step 5: the warning set is exhaustive, so an absent ruleset
+  anchor is reported on the step line and is not a WARNING.
+- Q10, section 7.3: a verifier accepts every RFC 3339 spelling its library
+  accepts, including a space separator and second `60`, and never rejects a
+  value on the grammar alone.
+- Q11, section 7.3: a wire value with more than six fractional digits is
+  truncated toward zero to microseconds, not rejected.
+- Q12, section 8.1: `schema_version` is a fail-closed discriminator; any value
+  other than `"1.0"` is rejected by name before any link is recomputed.
+- Q13, section 8.1: an export with zero rows fails -- it establishes no head.
+- Q14, section 8.1: the row at position *i* must carry ordinal *i*, and a
+  verifier must not sort the array to establish the order it then checks.
+- Q15, section 9.6: the reserved-token mask is case-insensitive, covers every
+  line of a `verify-package` surface including error text, and SHOULD print a
+  legend once when it actually reached the output.
+- Q16, section 8.1 and section 9.6 step 1: the chain export gets its own read
+  cap (the reference caps it at 50 MiB), and "regular file" excludes symlinks,
+  which are tested with `lstat` rather than followed.
+- R2b, section 4.1 Money: the two sentences the grammar probe measured wrong
+  were rewritten from what the reference actually does. A `_` is ignored once
+  a digit has appeared anywhere earlier in the significand and need not be
+  immediately preceded by one, so `1000._5` is a monetary value (`1000.5`) and
+  not a string, while a separator inside the exponent (`1e_5`) is not; and
+  surrounding whitespace is NOT trimmed, unlike date-time, date and duration.
+  Without an exponent the candidate scale starts at `min(f, 28)` and is
+  decremented, re-rounding from the original digits, until the mantissa is
+  strictly below 2^96, so `9.9999999999999999999999999999` recovers as `10`
+  and only a value with no workable scale reaches `String`. With an exponent
+  and at most 28 fractional digits nothing is rounded and the written digit
+  string, padded for a negative folded scale, must fit a 29-digit budget that
+  leading zeros also spend (`5e28` is monetary, `0.5e29` is not, though they
+  denote one value); with MORE than 28 fractional digits the mantissa is
+  rounded and the exponent is DISCARDED, so
+  `1.99999999999999999999999999999e1` recovers as `2` and not `20`. Four
+  corpus cases and 84 probe values pin the rewritten sentences.
+- `tests/grammar_probe.rs`: a Rust `PANIC` inside the crash band section 4.1
+  DECLARES for the reference's millisecond-scaled duration representation
+  (summed seconds of magnitude above `i64::MAX / 1000`, still within `i64`) is
+  now recorded as `KNOWN_REFERENCE_DEFECT` and counts as agreement, provided
+  the Python leg gives the specification's `String` fall-through; the values
+  are printed. It is the ONLY tolerated crash, and it is carried as
+  version-bump debt of the reference. A panic outside the band, a band value
+  that does not panic, and any other Python answer for a band value all stay
+  failures.
+- R3, section 4.1 Money: the exponent rule is ONE bullet with three outcomes,
+  decided by what the exponent-free rule does to the MANTISSA alone, not by
+  the mantissa's fractional-digit count. If the mantissa does not fit at any
+  scale the whole string reaches `String` whatever the exponent
+  (`79228162514264337593543950336e-28`); if it fits EXACTLY the exponent is
+  folded exactly, under the 29-digit written budget the previous revision
+  already described; and if it fits only AFTER rounding, the rounded mantissa
+  is the value and the exponent is DISCARDED. The old boundary was wrong for
+  a measured family of twelve values with 28, 28, 2 and 1 fractional digits
+  (`7.9228162514264337593543950336e*`, `9.9999999999999999999999999999e*`,
+  `9999999999999999999999999999.99e*`, `79228162514264337593543950335.5e*`)
+  and decided `7.9228162514264337593543950336e28` twice, in opposite
+  directions; that value is decided once now, as
+  `7.922816251426433759354395034`.
+- R3, section 4.1 Money: the procedure names the decimal library version it
+  was measured against (`rust_decimal` 1.37.2) and the fact that the reference
+  pins it exactly. Later releases of that library canonicalize some
+  exponent-form values differently.
+- R3, section 4.1 Date: a year may carry a leading `+` or `-` sign, which the
+  canonical four-digit form does not keep (`+2026-5-13` recovers as
+  `2026-05-13`, `-0000-05-13` as `0000-05-13`); a signed year of more than
+  four digits, a doubled sign and a trailing sign all reach `String`.
+- R3, section 4.1 Date-time: the numeric offset may be written without the
+  colon, in the four-digit `+HHMM` / `-HHMM` form, and means the same instant;
+  the hour-only, unpadded and three-digit spellings reach `String`, and the
+  range bound applies to this spelling too.
+- `tests/fixtures/spec_gap_ids.txt` and
+  `tests/intent_spec_gaps_have_cases.rs`: the identifier list of the review
+  ledger now travels inside the crate, and a test asserts both directions --
+  no corpus case may carry an identifier the list does not know, and every
+  identifier whose family a package can exercise must be carried by at least
+  one case.
+- `tests/grammar_probe.rs`: the Rust leg ALWAYS regenerates the Python
+  answers instead of reusing a file it finds, and the runner stamps a header
+  naming the sha256 of the reference and of the probe list it read, which the
+  Rust leg recomputes and refuses on mismatch. A sabotaged reference with a
+  stale answer file beside it used to read green.
 
 ### Fixed
+- The crate is published from the staging tree of the public export, and that
+  export runs the Python reference of route E in its isolated build - which
+  compiles it, leaving a `reference/__pycache__/*.pyc` behind, after the scan
+  that would have seen it. Measured on this release's export: a machine-specific
+  build artifact inside `cargo package --list`. The manifest now excludes
+  `**/__pycache__`, so no release can carry one.
+- RUST-BUG-02. The workspace pinned `rust_decimal` as `"1.33"`, so a build
+  that resolves its own lockfile could pick any 1.x. It resolved 1.37.2 in the
+  development tree and 1.42.1 in a fresh one - and a fresh one is what the
+  public export and the published `.crate` carry - and the two disagree on the
+  canonical form of three exponent-form monetary values, which is a different
+  verdict hash for the same package. The version is now pinned exactly to
+  `=1.37.2`, the one the specification's Money procedure was measured against,
+  and `chrono` to `=0.4.41` for the same reason; no behaviour of this tree
+  changes, and a freshly generated lockfile now resolves the same version the
+  production emitter uses.
 - CHANGELOG: the `0.3.5` entry below says the `.crate` published as `0.3.4`
   "still carries the wrong sentence" and that an auditor reads this file
   "inside that tarball". Measured against the tarballs crates.io serves, that

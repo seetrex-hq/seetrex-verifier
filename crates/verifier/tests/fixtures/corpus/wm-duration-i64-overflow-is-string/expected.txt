@@ -1,0 +1,10 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 4.1 Type inference precedence
+# note: 4.1 Duration: the summed seconds MUST fit a signed 64-bit integer. This value
+# note: is i64::MAX + 1, so it is not a duration and reaches String, hashing verbatim.
+# note: It sits BELOW the reference implementation's declared crash band (magnitude
+# note: above i64::MAX/1000 seconds), so it is answerable by both legs.
+# note: Derived from the sentence before either binary was run.
+# gap: SPEC-GAP-4.1-duration-2

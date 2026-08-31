@@ -1,0 +1,6 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 4. Canonical value forms
+# gap: SPEC-GAP-4.1-datetime-3
+# note: SPEC 4.1 Date-time (R3): the colon-less +HHMM offset means the same as +02:00, so this recovers the same 2026-07-18T21:59:59Z instant and reuses its verdict hash.

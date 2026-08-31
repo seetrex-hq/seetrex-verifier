@@ -1,0 +1,12 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 4.1 Type inference precedence
+# note: 4.1 Money, `_` grammar: a separator is ignored once a digit has already
+# note: appeared in the significand; it need NOT be immediately preceded by one.
+# note: `1000._5` has four digits before the `_`, so it IS a monetary value and
+# note: canonicalizes to `1000.5`. The previous revision read the rule as
+# note: `immediately preceded` and sent this string to String, which hashes the
+# note: package differently and exits 1 -- that is the divergence this case pins.
+# note: Derived from the sentence, not from either binary's output.
+# gap: SPEC-GAP-4.1-money-2

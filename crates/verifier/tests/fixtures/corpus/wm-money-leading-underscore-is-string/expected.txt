@@ -1,0 +1,9 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 4.1 Type inference precedence
+# note: 4.1 Money: every `_` MUST be preceded by a digit, so a separator that opens
+# note: the string is not a monetary value and reaches String; String re-serializes
+# note: verbatim, so the canonical value is `_1000` and the hash is the one of that
+# note: string. Derived from the sentence before either binary was run.
+# gap: SPEC-GAP-4.1-money-2

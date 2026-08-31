@@ -1,0 +1,4 @@
+token=
+exit=1
+class=FAIL
+# spec: 2. Conventions and primitives

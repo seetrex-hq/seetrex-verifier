@@ -1,0 +1,5 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 4. Canonical value forms
+# gap: SPEC-GAP-4.1-string

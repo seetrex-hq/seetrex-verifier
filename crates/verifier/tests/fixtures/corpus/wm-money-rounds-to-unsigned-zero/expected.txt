@@ -1,0 +1,9 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 4.1 Type inference precedence
+# note: 4.1 Money: rounding half away from zero at scale 28 takes this value to zero,
+# note: and `a zero carries no sign in the canonical form` applies to a value that
+# note: becomes zero BY ROUNDING as well -- the canonical form is `0`, never `-0`.
+# note: Derived from the sentence before either binary was run.
+# gap: SPEC-GAP-4.1-money

@@ -1,0 +1,12 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 4.1 Type inference precedence
+# note: 4.1 Money: the mantissa MUST be strictly below 2^96
+# note: (79228162514264337593543950336). This one has 31 digits, so the string is not
+# note: a monetary value and reaches String, hashing verbatim. (Renamed from
+# note: `wm-money-29-significant-digits`, which named a boundary that is not the real
+# note: one: 29 significant digits can fit.) Derived from the sentence before either
+# note: binary was run.
+# gap: DIV-05
+# gap: SPEC-GAP-4.1-money-2

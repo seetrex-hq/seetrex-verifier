@@ -1,0 +1,5 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 6.1 Document completion rules
+# gap: SPEC-GAP-Q8

@@ -1,0 +1,5 @@
+token=VERIFIED OFFLINE
+exit=0
+class=PASS
+# spec: 8.1 The public chain export
+# gap: SPEC-GAP-8.1-VOCAB

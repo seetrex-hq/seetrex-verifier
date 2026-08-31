@@ -1,0 +1,28 @@
+{
+  "control_id": "vulnerability_handling",
+  "engine_semantic_version": 6,
+  "evidence_refs": [
+    {
+      "content_hash": "b2ac67eddf17098c445832286506b5e70f29fce4f168465c9cdfc17733bbf164",
+      "evidence_id": "7a54f0cc-7ec2-423b-81f3-029961effc94"
+    },
+    {
+      "content_hash": "f5c09386daa98920123f845a0ebd148d76d4b97e5f727a1fb433bf078f2fd110",
+      "evidence_id": "a2ce0096-9fed-4e70-ba58-14bcf57e5da8"
+    }
+  ],
+  "id": "cbfb1c0d-13dc-4093-874d-c636c8a56653",
+  "inferred_at": "2026-07-17T22:59:29.163178Z",
+  "preimage_version": 2,
+  "ruleset_content_hash": "ddc5eb369b10c0bc120ec43e665f049b2b2c197fe570e7c669b81b650331d865",
+  "ruleset_id": "cra-art13-vulnerability-handling",
+  "ruleset_version": 2,
+  "tenant_id": "5ee70000-0000-0000-0000-000000000f1c",
+  "verdict_hash": "066f6bcb08865beb644f5f371c58fc23b31a6e34b96c160ccceedc646fe83743",
+  "verdict_outcome": "VIOLATED",
+  "working_memory_canonical": {
+    "CRA.Art13.criticals_many": true,
+    "CRA.Art13.freshness_basis_scan_native": true,
+    "CRA.Art13.verdict_VIOLATED": "VIOLATED"
+  }
+}

@@ -1,0 +1,6 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 4. Canonical value forms
+# gap: SPEC-GAP-4.1-date-2
+# note: SPEC 4.1 Date (R3): a leading + on the year is consumed, so this recovers the same 2026-05-13 as the unpadded spelling and reuses its verdict hash.

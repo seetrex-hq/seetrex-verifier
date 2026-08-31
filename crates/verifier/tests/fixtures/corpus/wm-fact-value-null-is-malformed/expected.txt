@@ -1,0 +1,10 @@
+token=
+exit=1
+class=FAIL
+# spec: 4.1 Type inference precedence
+# note: 4.1, `No third state`: a fact value that is JSON `null` matches no candidate of
+# note: the precedence; it is MALFORMED and a verifier MUST reject the package rather
+# note: than canonicalize it verbatim. No hash is recomputed, so the packaged
+# note: verdict_hash is irrelevant to the expectation.
+# note: Derived from the sentence before either binary was run.
+# gap: SPEC-GAP-4.1-third-state

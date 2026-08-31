@@ -1,0 +1,45 @@
+{
+  "canonical_blob_key": null,
+  "canonical_blob_size_bytes": null,
+  "canonical_inline": "{\"CreatedAt\":\"2026-06-29T10:00:00Z\",\"Results\":[{\"Target\":\"test-fixture-d1-spike (alpine 3.19)\",\"Vulnerabilities\":[{\"FixedVersion\":\"3.0.12-r0\",\"PkgName\":\"openssl\",\"PublishedDate\":\"2025-01-15T10:30:00Z\",\"Severity\":\"CRITICAL\",\"VulnerabilityID\":\"CVE-2024-12001\"},{\"FixedVersion\":\"1.2.4-r3\",\"PkgName\":\"musl\",\"PublishedDate\":\"2025-02-20T09:00:00Z\",\"Severity\":\"CRITICAL\",\"VulnerabilityID\":\"CVE-2024-12002\"},{\"FixedVersion\":\"1.36.1-r5\",\"PkgName\":\"busybox\",\"PublishedDate\":\"2025-03-10T14:00:00Z\",\"Severity\":\"CRITICAL\",\"VulnerabilityID\":\"CVE-2024-12003\"}]},{\"Target\":\"package-lock.json\",\"Vulnerabilities\":[{\"FixedVersion\":\"4.17.21\",\"PkgName\":\"lodash\",\"PublishedDate\":\"2025-04-05T08:15:00Z\",\"Severity\":\"HIGH\",\"VulnerabilityID\":\"CVE-2024-23456\"},{\"FixedVersion\":\"0.28.0\",\"PkgName\":\"axios\",\"PublishedDate\":\"2025-05-12T16:45:00Z\",\"Severity\":\"MEDIUM\",\"VulnerabilityID\":\"CVE-2024-34567\"},{\"FixedVersion\":\"4.19.0\",\"PkgName\":\"express\",\"PublishedDate\":\"2026-06-20T12:00:00Z\",\"Severity\":\"LOW\",\"VulnerabilityID\":\"CVE-2024-45678\"},{\"FixedVersion\":\"1.2.8\",\"PkgName\":\"minimist\",\"PublishedDate\":\"2025-06-01T00:00:00Z\",\"Severity\":\"UNKNOWN\",\"VulnerabilityID\":\"CVE-2024-56789\"}]}],\"SchemaVersion\":2}",
+  "canonical_kind": "inline",
+  "category": "vuln_scan",
+  "contains_pii_flag": false,
+  "content_hash": "b2ac67eddf17098c445832286506b5e70f29fce4f168465c9cdfc17733bbf164",
+  "derived_facts": [
+    {
+      "connector_version": "0.1.10",
+      "derivation_fn": "compliance@0.1.10::connectors::trivy::derive::from_parsed",
+      "fact_id": "vuln_scan.age_hours",
+      "fact_value_kind": "number"
+    },
+    {
+      "connector_version": "0.1.10",
+      "derivation_fn": "compliance@0.1.10::connectors::trivy::derive::from_parsed",
+      "fact_id": "vuln_scan.age_basis",
+      "fact_value_kind": "string"
+    },
+    {
+      "connector_version": "0.1.10",
+      "derivation_fn": "compliance@0.1.10::connectors::trivy::derive::from_parsed",
+      "fact_id": "vuln_critical_open_over_7d.count",
+      "fact_value_kind": "number"
+    },
+    {
+      "connector_version": "0.1.10",
+      "derivation_fn": "compliance@0.1.10::connectors::trivy::derive::from_parsed",
+      "fact_id": "vuln_high_open_over_14d.count",
+      "fact_value_kind": "number"
+    },
+    {
+      "connector_version": "0.1.10",
+      "derivation_fn": "compliance@0.1.10::connectors::trivy::derive::from_parsed",
+      "fact_id": "remediation_policy.critical_sla_days",
+      "fact_value_kind": "number"
+    }
+  ],
+  "id": "7a54f0cc-7ec2-423b-81f3-029961effc94",
+  "ingested_at": "2026-07-17T22:59:28.145022+00:00",
+  "source_id": "trivy.scan_report.v2",
+  "tenant_id": "5ee70000-0000-0000-0000-000000000f1c"
+}

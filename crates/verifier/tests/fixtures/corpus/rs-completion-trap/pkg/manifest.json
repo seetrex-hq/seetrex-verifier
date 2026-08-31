@@ -1,0 +1,17 @@
+{
+  "package_format_version": 2,
+  "tenant_id": "5ee70000-0000-0000-0000-000000000f1c",
+  "verdict_id": "cbfb1c0d-13dc-4093-874d-c636c8a56653",
+  "verdict_hash": "066f6bcb08865beb644f5f371c58fc23b31a6e34b96c160ccceedc646fe83743",
+  "chain_prev_hash": null,
+  "chain_hash": "3ce54560f4375f111433aa8a417d94bb823f6c7212756b710ccebba0a464a497",
+  "replay_token": "XucAAAAAAAAAAAAAAAAPHMv7HA0T3ECTh03GNsilZlMGb2vLCIZb62RPXzccWPwjsxpuNLlsFgzM7txkb-g3Qw",
+  "appended_at": "2026-07-17T22:59:29.183499+00:00",
+  "files": [
+    "verdict.json",
+    "ruleset.json",
+    "evidence/7a54f0cc-7ec2-423b-81f3-029961effc94.json",
+    "evidence/a2ce0096-9fed-4e70-ba58-14bcf57e5da8.json",
+    "manifest.json"
+  ]
+}

@@ -1,0 +1,4 @@
+token=
+exit=1
+class=FAIL
+# spec: 9.6 Package integrity verification (`verify-package`)

@@ -1,6 +1,6 @@
 # Seetrex Compliance — Verdict Audit Package Format Specification
 
-> **Status: v1.0-draft — format as implemented at commit 6123df1; pending adversarial review.**
+> **Status: v1.0-draft — format as implemented at commit 6123df1; independently re-implemented from this document alone (see `crates/verifier/reference/`: a Python implementation written blind, a 92-case conformance corpus and a 528-value differential grammar probe, both run in CI). Known limits of the REFERENCE implementation, not of the format: the Duration crash band declared in section 4.1, and the exact dependency pins (`rust_decimal` 1.37.2, `chrono` 0.4.41) that section names. The clarifications dated 2026-08-30 replace what this document previously stated; a reader holding an earlier copy holds a document the reference never implemented as written.**
 
 **Spec version:** 1 (draft) · **Describes:** `package_format_version: 2` packages ·
 **Preimage versions covered:** 1 and 2
@@ -67,7 +67,13 @@ and never changes afterwards (§7.4).
 - **Hex encoding.** All hashes are encoded as 64 lowercase hexadecimal
   characters (`[0-9a-f]{64}`). Verifiers SHOULD accept uppercase input for
   externally supplied expected values and compare case-insensitively, but MUST
-  emit lowercase.
+  emit lowercase. A verifier MUST also accept uppercase hex in
+  package-internal hash **comparisons** (it compares them
+  case-insensitively); this tolerance does not extend to any hex string that
+  is itself a hash **preimage** — `manifest.verdict_hash` feeds the §8 chain
+  link over its ASCII bytes, so a non-lowercase spelling there changes the
+  link and fails step 4 of §9.6.
+  *(Clarified 2026-08-30, T10 — Q3.)*
 - **JSON canonicalization.** "JCS" means RFC 8785: object members sorted by
   the UTF-16 code units of their names, no insignificant whitespace, minimal
   string escaping, numbers serialized in the ECMAScript shortest round-trip
@@ -120,6 +126,11 @@ Plain (non-canonicalized) JSON with the fields:
 | `appended_at` | RFC 3339 string | when the chain row was appended |
 | `files` | array of strings | inventory of archive members |
 | `files_sha256` | object (string → hex string), OPTIONAL | per-file integrity index (§3.1.1); present in packages emitted by CLI ≥ 0.1.11 |
+
+Only `verdict_id`, `verdict_hash`, `chain_hash` and `files` are load-bearing
+for §9.6; a manifest missing any other field, or a manifest that does not list
+itself in `files`, verifies, and unknown manifest keys are ignored.
+*(Clarified 2026-08-30, T10 — Q4.)*
 
 **The manifest is not cryptographically covered by anything.** No hash defined
 in this specification commits to the manifest's bytes, and `verdict_id` is not
@@ -193,6 +204,11 @@ Plain JSON with the fields:
 { "evidence_id": "<uuid>", "content_hash": "<64-char lowercase hex>" }
 ```
 
+Unlike §6.1's ruleset, the key sets of `verdict.json` and of
+`evidence/<uuid>.json` are OPEN: a verifier MUST ignore keys it does not know,
+which also means such keys are bound by no hash unless `files_sha256` is
+present. *(Clarified 2026-08-30, T10 — Q6.)*
+
 ### 3.3 `evidence/<uuid>.json`
 
 One plain-JSON file per referenced evidence row. Fields relevant to
@@ -200,10 +216,15 @@ verification:
 
 | Field | Type | Role |
 |---|---|---|
-| `id` | UUID string | matches the filename and the `evidence_id` in `evidence_refs` |
+| `id` | UUID string | the record's identity; matches the `evidence_id` in `evidence_refs` (see below) |
 | `category` | string | evidence category (used by re-derivation) |
 | `content_hash` | hex string | commitment to the canonical payload (§5) |
 | `canonical_inline` | string or `null` | the canonical evidence payload, inline; `null` when the payload is stored out-of-band ("blob reference") |
+
+The `id` field, not the filename, establishes an evidence record's identity;
+a verifier MUST NOT fail a package because `evidence/<A>.json` carries
+`id: <B>`, provided the multiset check of §9.6 step 3 holds.
+*(Clarified 2026-08-30, T10 — Q5.)*
 
 Remaining fields (`tenant_id`, `source_id`, `canonical_kind`,
 `canonical_blob_key`, `canonical_blob_size_bytes`, `derived_facts`,
@@ -221,11 +242,26 @@ file) that the verdict was evaluated against. Its content hash is defined in
 ## 4. Canonical value forms
 
 The verdict's `working_memory_canonical` is a JSON object mapping **fact
-identifiers** to **fact values**. These forms are normative for emitters and
-for anyone independently re-deriving facts from evidence. For plain hash
-recomputation from a package they are informative: the auditor takes the JSON
-values exactly as they appear in `verdict.json` and canonicalizes them with
-JCS (§7.1) — no value transformation is performed at verification time.
+identifiers** to **fact values**. These forms are normative for emitters,
+for anyone independently re-deriving facts from evidence, **and for hash
+recomputation from a package**: a verifier MUST recover every
+`working_memory_canonical` value through the §4.1 type inference and
+re-serialize it in its §4 canonical form before JCS (§7.1) — exactly as the
+emitter would have serialized it. A stored monetary string with trailing
+fractional zeros, a duration not in canonical unit-chain form, or a date-time
+carrying a numeric UTC offset therefore hashes as its canonical form, and the
+verdict hash is invariant under those normalizations. A verifier that
+canonicalizes the stored JSON values verbatim (JCS only, no §4 recovery)
+produces a different hash for such a package and is NOT conformant.
+
+> *Clarified 2026-08-30 (T10, `DIV-01`).* Until this revision the paragraph
+> above read «the auditor takes the JSON values exactly as they appear in
+> `verdict.json` … no value transformation is performed at verification
+> time», contradicting §4.1's own «normalizes recovered values … on
+> re-serialization». The reference implementation has always normalized;
+> an implementation written from the earlier wording alone reproduced the
+> contradiction as a hash mismatch on a package whose stored monetary value
+> was `"100.50"`.
 
 - **Fact identifiers** (object keys) MUST be ASCII.
 - **Boolean** facts: JSON `true` / `false`.
@@ -243,8 +279,9 @@ JCS (§7.1) — no value transformation is performed at verification time.
   reference serializer emits the shortest exact representation with
   fractional digits in groups of three (0, 3, 6 or 9 digits), and an input
   carrying a numeric UTC offset (`+00:00`) is normalized to `Z` on
-  re-serialization. For hash recomputation from a package this is moot —
-  the stored string is used verbatim.
+  re-serialization. For hash recomputation from a package the same
+  normalization applies (a stored `+00:00` offset hashes as `Z`; see the
+  opening paragraph of this section).
 - **Date** facts: JSON strings, ISO 8601 `YYYY-MM-DD`.
 - **Duration** facts: JSON strings in canonical unit-chain form
   `[-]<D>d<H>h<M>m<S>s` with zero-valued components omitted and the value
@@ -280,6 +317,276 @@ The reference implementation normalizes recovered values to the §4 canonical
 forms on re-serialization: a duration parsed from `"90m"` re-serializes as
 `"1h30m"`, a date-time carrying a `+00:00` offset re-serializes with `Z`,
 and a monetary string re-serializes with trailing fractional zeros trimmed.
+
+**Accepted grammar per kind (normative for verification).** The precedence
+above orders the candidates; it does not say which strings each candidate
+ACCEPTS, and that is the half a verifier needs: a value one implementation
+recovers as a `Duration` and another leaves a `String` re-serializes
+differently and therefore hashes differently. The grammars below are the
+reference ones and are normative for hash recomputation. Each entry states
+what is accepted, the canonical re-serialization, and what falls through to
+the next candidate. *(Clarified 2026-08-30, T10 -- R1-A C-1.)*
+
+- **Boolean** accepts the JSON literals `true` and `false` and nothing else.
+  Re-serialized as the same literal. The JSON *strings* `"true"` / `"false"`
+  are not booleans; they reach `String`.
+- **Number** accepts JSON numbers only, never a string. Re-serialized by JCS
+  (RFC 8785 number formatting): `24.0` re-serializes as `24`.
+- **Money** accepts a JSON string matching
+  `^[+-]?[0-9_]*([.][0-9_]*)?([eE][+-]?[0-9]+)?$` with at least one digit
+  present, where `_` is a digit separator and is ignored. A leading `+`, a
+  bare leading `.` (`".5"`), a trailing `.` (`"5."`, `"1.e5"`) and an
+  exponent (`"1e5"`, `"1e+5"`) are all accepted. Surrounding whitespace is
+  NOT trimmed — unlike date-time, date and duration, which do trim it — so
+  `" 1.5"`, `"1.5 "` and a leading tab are not monetary values and reach
+  `String`. *(Clarified 2026-08-30, T10 — R2b.)*
+  **A `_` is ignored once a digit has already appeared in the significand,
+  and is never allowed inside the exponent.** It need only FOLLOW a digit
+  somewhere earlier in the significand; it need NOT be immediately preceded
+  by one — this replaces the "every `_` MUST be preceded by a digit" of the
+  previous revision, which wrongly sent `"1000._5"` to `String`. So a
+  separator that opens the string (`"_1000"`, `"_"`), that follows the sign
+  (`"-_1"`, `"+_1"`) or that stands before the first digit of a significand
+  whose integer part is empty (`"._5"`, `"+._5"`, `"_._"`) is not a monetary
+  value and reaches `String`, and neither is one inside the exponent
+  (`"1e_5"`, `"1e1_0"`); while `"1_000"`, `"1__000"`, `"1000_"`, `"1_.5"`,
+  `"1_e3"`, `"1.5_"`, `"1._"`, `"1_2_3.4_5_6"` and — a digit having already
+  appeared — `"0._5"`, `"1._5"` and `"1000._5"` are monetary.
+  *(Clarified 2026-08-30, T10 — R2b.)*
+  The value MUST fit the reference decimal representation: an integer
+  mantissa strictly below 2^96 = `79228162514264337593543950336` with a
+  scale of 0 to 28, the value being mantissa / 10^scale. **The whole
+  procedure below was measured against `rust_decimal` 1.37.2**, the decimal
+  library the reference implementation uses, and the reference pins that
+  version EXACTLY (`rust_decimal = "=1.37.2"` in the workspace
+  `Cargo.toml`): later releases of that library have been measured to
+  canonicalize some exponent-form values differently, so a build that floats
+  the version produces a different hash for the same package.
+  *(Clarified 2026-08-30, T10 — R3.)* **What happens when
+  the written digits do not fit depends on whether the string carries an
+  exponent, and the three cases below behave differently.**
+  *(Clarified 2026-08-30, T10 — R2b.)*
+  - **Without an exponent**, digits beyond the representation are ROUNDED
+    away, not rejected. Remove the `_`s and let `f` be the number of
+    fractional digits. Take the candidate scale `s = min(f, 28)` and round
+    the written value to `s` fractional digits; while the resulting mantissa
+    is NOT strictly below 2^96, decrement `s` and round again FROM THE
+    ORIGINAL digits (never from the previous result, never digit by digit).
+    If `s` would fall below 0 the string is not a monetary value and reaches
+    `String`. The rounding mode is **half away from zero**, in both signs and
+    whatever the digit before the cut: the exact ties
+    `"0.12345678901234567890123456785"`,
+    `"0.123456789012345678901234567850"`, `"0.12345678901234567890123456775"`
+    and `"1.00000000000000000000000000005"` all round UP, to
+    `"0.1234567890123456789012345679"`, `"0.1234567890123456789012345679"`,
+    `"0.1234567890123456789012345678"` and `"1.0000000000000000000000000001"`,
+    and their negatives round up in magnitude.
+    `"0.99999999999999999999999999995"` hashes as `"1"`, and 40 fractional
+    zeros (`"0.0000000000000000000000000000000000000001"`) as `"0"`.
+    *(Clarified 2026-08-30, T10 — R2b.)*
+    The scale is reduced BELOW 28 whenever the mantissa needs it, which is
+    the half the previous revision omitted: `"7.9228162514264337593543950336"`
+    would need mantissa 2^96 at scale 28, so it drops to scale 27 and hashes
+    as `"7.922816251426433759354395034"`; `"9.9999999999999999999999999999"`
+    hashes as `"10"`; a 28-digit integer part leaves room for exactly ONE
+    fractional digit, so
+    `"1234567890123456789012345678.12345678901234567890123456789"` hashes as
+    `"1234567890123456789012345678.1"`; and `"9999999999999999999999999999.99"`
+    drops two scales to hash as `"10000000000000000000000000000"`. When no
+    candidate scale works the string reaches `String`:
+    `"+79228162514264337593543950336"` and
+    `"+123456789012345678901234567890"` have an integer part at or above
+    2^96, and `"+79228162514264337593543950335.5"` rounds at scale 0 exactly
+    ONTO 2^96 — while its neighbours `"79228162514264337593543950335.4"` and
+    `"79228162514264337593543950334.5"` both hash as
+    `"79228162514264337593543950335"`.
+    *(Clarified 2026-08-30, T10 — R2b.)*
+  - **With an exponent**, apply the rule above to the MANTISSA ALONE first
+    (the digits before the `e`, exponent ignored), and let its outcome decide
+    what the exponent does. There are exactly three outcomes.
+    *(Clarified 2026-08-30, T10 — R3.)*
+    - The mantissa **does not fit at any scale** - the exponent-free rule
+      reaches `String` - and so does the whole string, whatever the
+      exponent: `"79228162514264337593543950336e-28"` (the mantissa IS 2^96),
+      `"99999999999999999999999999999e-1"`,
+      `"199999999999999999999999999999e-29"`,
+      `"1234567890123456789012345678901e-3"`,
+      `"79228162514264337593543950335.5e0"` and
+      `"79228162514264337593543950335.5e1"` (rounding at scale 0 lands
+      exactly ON 2^96).
+    - The mantissa **fits EXACTLY**, meaning the exponent-free rule rounded
+      no digit away: at most 28 fractional digits and a digit string below
+      2^96 as written. Only then is the exponent FOLDED, and it is folded
+      exactly - nothing is rounded. Write the mantissa's digits in order -
+      the integer part EXACTLY as written, an empty integer part counting as
+      a single `0`, then the fractional digits - and let `k` be the
+      fractional-digit count minus the exponent. If `k` is negative, append
+      `|k|` zeros to that digit string and set `k` to 0. The folded value is
+      a monetary value iff the digit string is at most 29 digits long, `k` is
+      at most 28, and the digit string read as an integer is strictly below
+      2^96; otherwise the string reaches `String`. **The leading zeros
+      written in the mantissa spend the 29-digit budget**, so `"5e28"`,
+      `"5.0e28"`, `"50e27"` and `"0.5e28"` are monetary while `"0.5e29"`,
+      `".5e29"`, `"00.5e29"` and `"0.05e30"` are not, although `"0.5e29"`
+      denotes exactly the value of `"5e28"`. Out of range the other ways, and
+      all reaching `String`: `"1e29"`, `"1e30"`, `"1e400"`, `"5e29"`,
+      `"8e28"` and `"9e28"` (digit string at or above 2^96 once padded),
+      `"0e100"` (the padding overflows the budget), and `"1e-29"`,
+      `"1e-400"`, `"1.5e-28"`, `"1.0e-28"`, `"10e-29"`, `"100e-30"` and
+      `"150e-31"` (`k` above 28). In range:
+      `"79228162514264337593543950335e-28"` hashes as
+      `"7.9228162514264337593543950335"`,
+      `"7.9228162514264337593543950335e28"` as
+      `"79228162514264337593543950335"`,
+      `"1.9999999999999999999999999999e1"` as
+      `"19.999999999999999999999999999"`, `"0.1e1"` and
+      `"0.0000000000000000000000000001e28"` as `"1"`, `"2.5e1"` as `"25"`,
+      `"1.2345e3"` as `"1234.5"`, `"1.2345e5"` as `"123450"`, and
+      `"123.45e-2"` and `"12.5e-1"` as `"1.2345"` and `"1.25"`.
+    - The mantissa **fits only AFTER rounding** - the exponent-free rule had
+      to drop a digit. Then the rounded mantissa IS the recovered value and
+      the exponent is **DISCARDED**. This is normative for hash
+      recomputation and is the one place where the recovered value is not the
+      value the string denotes, so an implementation that folds the exponent
+      first produces a different hash for the same package. The exponent
+      makes no difference at all here, which is how the family is recognized:
+      `"7.9228162514264337593543950336e0"`,
+      `"7.9228162514264337593543950336e1"`,
+      `"7.9228162514264337593543950336e-1"` and
+      `"7.9228162514264337593543950336e28"` ALL hash as
+      `"7.922816251426433759354395034"`;
+      `"9.9999999999999999999999999999e0"`,
+      `"9.9999999999999999999999999999e1"` and
+      `"9.9999999999999999999999999999e-1"` all as `"10"`;
+      `"9999999999999999999999999999.99e0"`,
+      `"9999999999999999999999999999.99e1"` and
+      `"9999999999999999999999999999.99e-1"` all as
+      `"10000000000000000000000000000"`;
+      `"0.99999999999999999999999999995e0"` and
+      `"0.99999999999999999999999999995e1"` both as `"1"`;
+      `"1234567890123456789012345678.12345678901234567890123456789e0"` and
+      the same mantissa with `e1` both as
+      `"1234567890123456789012345678.1"`;
+      `"1.99999999999999999999999999999e1"`,
+      `"1.99999999999999999999999999999e2"` and
+      `"1.99999999999999999999999999999e28"` all as `"2"` and never as
+      `"20"`, `"200"` or `"2e28"`;
+      `"1.99999999999999999999999999999e-1"` also as `"2"` and not `"0.2"`;
+      and `"1.00000000000000000000000000001e0"`,
+      `"1.00000000000000000000000000001e1"`,
+      `"1.000000000000000000000000000001e2"` and
+      `"0.12345678901234567890123456785e-1"` as `"1"`, `"1"`, `"1"` and
+      `"0.1234567890123456789012345679"`.
+    Note that `"99999999999999999999999999999e-1"` denotes the same value as
+    `"9999999999999999999999999999.9"`, which IS monetary and hashes as
+    `"10000000000000000000000000000"`: a mantissa that does not fit is never
+    rescued by its exponent, so the two spellings of one value do not agree.
+    The boundary between the last two outcomes is whether the exponent-free
+    rule ROUNDED, never the fractional-digit count of the mantissa: the
+    previous revision drew it at "more than 28 fractional digits" and was
+    wrong for a measured family of twelve values - the four
+    `"7.9228162514264337593543950336e*"`, the three
+    `"9.9999999999999999999999999999e*"`, the three
+    `"9999999999999999999999999999.99e*"` and the two
+    `"79228162514264337593543950335.5e*"` - which have 28, 28, 2 and 1
+    fractional digits and are nevertheless decided by rounding. That drawing
+    also decided `"7.9228162514264337593543950336e28"` twice, in opposite
+    directions; the value is decided ONCE here, by the third outcome.
+    *(Clarified 2026-08-30, T10 — R3.)*
+  Canonical re-serialization is the decimal string with trailing fractional
+  zeros removed and a resulting trailing `.` removed, so `"+5"` hashes as
+  `"5"`, `"1e5"` as `"100000"` and `"100.50"` as `"100.5"`. **A zero carries
+  no sign in the canonical form**: `"-0.00"` hashes as `"0"`, which is the
+  one place the "sign is preserved" rule of the list above does not apply.
+  The rule applies to a value that becomes zero BY ROUNDING as well:
+  `"-0.000000000000000000000000000005"` hashes as `"0"`, never `"-0"`.
+  *(Clarified 2026-08-30, T10 — R2.)*
+- **Date-time** accepts a JSON string its RFC 3339 parser accepts: `T`, `t`
+  or a single space as the date/time separator, `Z`, `z` or a numeric
+  `+HH:MM` / `-HH:MM` offset, any number of fractional digits, and second
+  `60` (see the mapping pinned in §7.3). The instant is normalized to UTC
+  and re-serialized as RFC 3339 with `Z` and the shortest exact fraction in
+  groups of three digits, so `"2026-07-18T23:59:59+02:00"` hashes as
+  `"2026-07-18T21:59:59Z"`. A string this parser rejects reaches the next
+  candidate. **The numeric offset is bounded**: its magnitude MUST be
+  strictly below `24:00` and its minute field below `60`, so
+  `"…+23:59"` is a date-time while `"…+24:00"`, `"…-24:00"`, `"…+25:00"`
+  and `"…+00:60"` are not and reach `String` — an implementation that
+  normalises an out-of-range offset instead of rejecting it produces a
+  different hash for the same package. Leading and trailing whitespace is
+  ignored, and the date and time components do not require zero padding
+  (`"2026-7-18T12:00:00Z"` is the same instant as `"2026-07-18T12:00:00Z"`).
+  *(Clarified 2026-08-30, T10 — R2.)* **The numeric offset may also be
+  written without the colon, in the four-digit `+HHMM` / `-HHMM` form**, and
+  it means the same thing: `"2026-07-18T23:59:59+0200"` hashes as
+  `"2026-07-18T21:59:59Z"`, `"2026-07-18T23:59:59-0530"` as
+  `"2026-07-19T05:29:59Z"` and `"2026-07-18T23:59:59-0000"` as
+  `"2026-07-18T23:59:59Z"`. Both fields are mandatory and both are exactly
+  two digits, so the hour-only `"…+02"`, `"…-05"` and `"…+00"`, the
+  unpadded `"…+2:00"` and the three-digit `"…+023"` are not date-times
+  and reach `String`; the range bound above applies to this spelling too, so
+  `"…+2400"` and `"…+0060"` reach `String` as well. The date component
+  of a date-time accepts a signed year exactly as **Date** does below, so
+  `"+2026-07-18T12:00:00Z"` hashes as `"2026-07-18T12:00:00Z"`.
+  *(Clarified 2026-08-30, T10 — R3.)*
+- **Date** accepts a JSON string parsed as `%Y-%m-%d`, which does **not**
+  require zero padding: `"2026-5-13"` is a date and re-serializes as
+  `"2026-05-13"`. Leading and trailing whitespace is ignored, and a year
+  written with fewer than four digits is accepted and zero-padded on
+  re-serialization (`"026-05-13"` hashes as `"0026-05-13"`).
+  *(Clarified 2026-08-30, T10 — R2.)* A calendar-invalid spelling such as
+  `"2026-02-30"` is not a date and reaches `String`. **The year may carry a
+  leading `+` or `-` sign**, which is consumed by the parser and does not
+  survive the four-digit padding of the canonical form: `"+2026-05-13"` and
+  `"+2026-5-13"` both hash as `"2026-05-13"`, and `"+0000-05-13"` and
+  `"-0000-05-13"` both as `"0000-05-13"` - a zero year, like a zero monetary
+  value, carries no sign. The sign MUST be immediately followed by a year of
+  at most four digits, so `"+12026-05-13"`, `"++2026-05-13"`,
+  `"+ 2026-05-13"` and the trailing-sign `"2026-05-13+"` are not dates and
+  reach `String`, and so does the calendar-invalid `"+2026-02-30"`.
+  *(Clarified 2026-08-30, T10 — R3.)* A leading `-` is accepted ONLY when the
+  year it signs is zero: `"-2026-05-13"` is not a date (there is no negative
+  year in this format) and reaches `String`, verbatim; the same holds for the
+  year of a date-time (`"-2026-07-18T12:00:00Z"` reaches `String`).
+  *(Clarified 2026-08-30, T10 — R3b: the R3 sentence let a blind reader
+  accept a minus on a non-zero year; measured, the reference does not.)*
+- **Duration** accepts a JSON string of an optional leading `-` followed by
+  one or more `<digits><unit>` groups, unit one of `s`, `m`, `h`, `d`;
+  surrounding whitespace is trimmed. Groups may repeat and may appear in any
+  order, and their seconds are SUMMED. There are no fractional units, no
+  week unit, and no sub-second precision. Re-serialized in the canonical
+  greedy form `[-]<D>d<H>h<M>m<S>s` with zero-valued components omitted and
+  `0s` for zero, so `"30m1h"`, `"90m"` and `"1h30m"` are the same value and
+  hash identically as `"1h30m"`, and `"5s5s"` hashes as `"10s"`. `"1.5h"`
+  (fractional) and `"PT1H"` (the ISO 8601 spelling) match no group of this
+  grammar and reach `String`. **The sum is bounded.** The summed seconds
+  MUST fit a signed 64-bit integer; a string whose groups overflow it
+  (`"9223372036854775808s"`, `"9223372036854775807m"`) is not a duration and
+  reaches `String`. *(Clarified 2026-08-30, T10 — R2.)* **Declared limit of
+  the reference implementation:** between that bound and the narrower bound
+  of its internal millisecond-scaled representation — magnitude above
+  `9223372036854775` seconds (`i64::MAX / 1000`) — the reference
+  implementation CRASHES (process exit 101) instead of returning a value:
+  `"9223372036854775s"` is a duration, while `"9223372036854776s"`,
+  `"2562047788015215h"` and `"9223372036854775807s"` abort it. This is a
+  known defect of the reference implementation, not of the format; the
+  format's bound is the i64 one above, and a conformant implementation
+  reaches `String` where the reference aborts.
+  *(Clarified 2026-08-30, T10 — R2.)*
+- **String** accepts every JSON string no earlier candidate took, and MUST be
+  ASCII; a non-ASCII string fact is rejected, not re-encoded (§4, and the
+  verifier duty in §9.6 step 6).
+- **List** accepts a JSON array; each element is recovered by this same
+  precedence and grammar, and element order is preserved.
+
+**No third state.** The candidates above cover every JSON form a fact value
+may take: a string, a number, a boolean and an array of the same. A fact
+value that is JSON `null` or a JSON **object**, at the top level or nested at
+any depth inside a list, matches NO candidate: it is **MALFORMED**, and a
+verifier MUST reject the package rather than canonicalize it verbatim.
+Passing such a value through would let two implementations hash the same
+package differently — one refusing it, one emitting `null` or `{…}` into the
+preimage. *(Clarified 2026-08-30, T10 — R2.)*
 
 ---
 
@@ -336,7 +643,11 @@ exhaustive, and conforming emitters reject unknown keys at every nesting
 level. Verifiers MUST reject a ruleset containing any key not listed in
 these tables, at any nesting level, as **malformed** (a distinct condition
 from a hash mismatch — a malformed document is outside this specification;
-a hash mismatch on a well-formed document indicates tampering or drift).
+a hash mismatch on a well-formed document indicates tampering or drift). The
+Type column of the tables below is normative as well: a scalar whose JSON type
+does not match it (a string `"2"`, or the non-integer number `2.0`, where an
+integer is declared) is malformed, and the verifier MUST reject it rather than
+canonicalize it. *(Clarified 2026-08-30, T10 — Q7.)*
 
 **Top-level object** (all fields required except `regulatory_source`):
 
@@ -388,7 +699,18 @@ canonical forms; the emitter guarantees published rulesets carry them in
 canonical text already (a non-canonical duration such as `"90m"` would be
 normalized to `"1h30m"` by the reference parse-and-re-serialize path, which
 plain JCS would not fix). A strict verifier MAY reject non-canonical string
-scalars outright.
+scalars outright. A verifier that does not take that option MUST recover a
+non-canonical **fact value** through the §4.1 type inference and re-serialize
+it in its §4 canonical form before canonicalizing the completed document —
+the same rule §4 already states for `working_memory_canonical`: a rule
+condition whose `value` is written `"90m"` enters the completed document as
+`"1h30m"`, and a verifier that carries it verbatim computes a different
+anchor and is NOT conformant. This applies to fact values only; the ruleset's
+plain string fields (`ruleset_id`, `framework`, `article`, `control`, `doc`,
+`facts_consumed`, `verdicts_emitted`, and a rule's `id`, `name` and
+`consequent`) are not fact values and are carried verbatim.
+*(Clarified 2026-08-30, T10 — Q8; the triage's proposed "verbatim" sentence
+was re-measured against the binary and is wrong for fact values.)*
 
 ### 6.2 What the anchor means, per preimage version
 
@@ -429,7 +751,7 @@ The preimage is a JSON object. Its member set depends on the preimage version.
 | `ruleset_version` | integer | `ruleset_version` |
 | `tenant_id` | UUID string | `tenant_id` |
 | `verdict_outcome` | string | `verdict_outcome` |
-| `working_memory_canonical` | object | `working_memory_canonical`, verbatim |
+| `working_memory_canonical` | object | `working_memory_canonical`, after §4.1 recovery and §4 canonical re-serialization of every value |
 
 Not in the preimage: `id` (`verdict_id`), `verdict_hash` itself,
 `inferred_at`, `ruleset_content_hash`, `preimage_version`, and every
@@ -463,7 +785,7 @@ Preimage v2 is preimage v1 plus two members. Full sorted key list:
 | `ruleset_version` | integer | `ruleset_version` |
 | `tenant_id` | UUID string | `tenant_id` |
 | `verdict_outcome` | string | `verdict_outcome` |
-| `working_memory_canonical` | object | `working_memory_canonical`, verbatim |
+| `working_memory_canonical` | object | `working_memory_canonical`, after §4.1 recovery and §4 canonical re-serialization of every value |
 
 The two added members make (a) the derivation timestamp and (b) the identity
 of the evaluated ruleset tamper-evident: any change to either changes
@@ -508,6 +830,31 @@ verifier therefore MUST parse `inferred_at` to a timestamp and re-format it
 under the fixed 6-digit rule; copying the wire string into the preimage is
 incorrect and, on legacy-emitter packages, produces a false mismatch on
 roughly any timestamp whose microseconds end in zeros.
+
+**Wire grammar (normative for verifiers).** On the wire, a verifier MUST
+accept every RFC 3339 spelling its date-time library accepts — at minimum
+`T`/`t`, `Z`/`z`, a numeric `±HH:MM` offset (normalised to UTC), a space in
+place of `T` (RFC 3339 §5.6), and second `60` — and MUST NOT reject a value on
+the grammar alone; a value that denotes a different instant than the emitter's
+will fail at the preimage instead. *(Clarified 2026-08-30, T10 — Q10.)*
+A wire value carrying more than six fractional digits is likewise not
+rejected: the verifier truncates it toward zero to microseconds, exactly as
+this section requires of the emitter, before building the preimage.
+*(Clarified 2026-08-30, T10 — Q11.)*
+
+**What second `60` denotes.** Accepting `60` on the wire (above) is not enough
+to recompute a hash from such a package: the verifier and the emitter must
+agree on the instant it maps to. A leap second parses to the SAME POSIX
+instant as second `59` of the same minute -- the two spellings share a
+timestamp -- while the parsed value retains the `60` spelling, which survives
+the truncation to microseconds and is re-emitted by the fixed 6-digit
+formatter. So `2026-07-18T23:59:60.123456Z` on the wire enters the preimage as
+the byte-identical string `2026-07-18T23:59:60.123456Z` (never rewritten to
+`...:59.123456Z`, whose preimage bytes and therefore whose verdict hash
+differ), and, being already in the canonical 6-digit form, it raises no
+non-canonical-wire WARNING. A leap second carrying no fraction re-formats to
+`...:60.000000Z` like any other whole-second value.
+*(Clarified 2026-08-30, T10 — R1-A I-1.)*
 
 ### 7.4 The `preimage_version` discriminator
 
@@ -635,6 +982,34 @@ equals the previous row's `chain_hash` (null exactly and only at ordinal 1),
 that the recomputed link equals the row's persisted `chain_hash`, and that
 ordinals are contiguous from 1. The resulting head (`verdict_count`,
 `last_chain_hash`) can then be compared against the published tenant page.
+
+`schema_version` is a fail-closed discriminator like `preimage_version` (§7.4)
+and `package_format_version` (§9.6 step 1): a verifier MUST reject any value
+other than `"1.0"`, naming it, before recomputing any link.
+*(Clarified 2026-08-30, T10 — Q12.)*
+An export with zero rows MUST fail: it establishes no head, so there is
+nothing an external anchor could attest and no claim a verifier could pass.
+*(Clarified 2026-08-30, T10 — Q13.)*
+`ordinal` describes the DOCUMENT as well as the values: the row at position
+*i* (1-based) MUST carry ordinal *i*, and a verifier MUST NOT sort the array
+to establish the order it then checks. *(Clarified 2026-08-30, T10 — Q14.)*
+A `verify-chain` implementation exits `0` when every link recomputes and `1`
+on any failure; the exit code `4` of §9.6 has no counterpart here, because a
+chain export's head is compared against the published page by the reader, not
+by an option of this command. *(Clarified 2026-08-30, T10 — Q1.)*
+On success the implementation MUST print a line containing the token
+`VERIFIED OFFLINE` — this is the surface §9.6 reserves the word `VERIFIED`
+FOR, and the two-word token is what a scripted reader matches. The token is
+matched as a substring of a line, not as a whole line, because the reference
+tooling prints it inside a sentence (`Public chain package VERIFIED OFFLINE`);
+the weaker `verify-package` tokens of §9.6 are matched as whole lines instead.
+The reserved word MUST NOT be printed in upper case anywhere else in the run,
+success or failure: a failing chain verification MUST NOT emit
+`VERIFIED OFFLINE` at all. *(Clarified 2026-08-30, T10 — R1-A I-2.)*
+A verifier SHOULD bound the export read; the reference implementation caps it
+at **50 MiB** — its own cap, larger than the 10 MiB per-file cap of §9.6,
+which would otherwise refuse an honest export at a few tens of thousands of
+rows. *(Clarified 2026-08-30, T10 — Q16.)*
 
 The export is obtained from the vendor's public Trust Center — for example
 (non-normative) the tenant's page under `https://trust.seetrex.com/` — over a
@@ -801,6 +1176,9 @@ observed values.
    outside the package). Every listed path MUST exist as a regular file in the
    package, and the package MUST contain no regular file other than
    `manifest.json` and the listed files. An undeclared extra file is a failure.
+   "Regular file" excludes symlinks: a verifier MUST test the link itself
+   (`lstat`), not its target, since a followed link reads outside the package.
+   *(Clarified 2026-08-30, T10 — Q16.)*
 2. **`files_sha256` (§3.1.1).** If the manifest carries `files_sha256`, the
    verifier MUST enforce it: the map's key set MUST equal the covered set
    exactly (every listed file except `manifest.json`, and no other key), and
@@ -833,7 +1211,10 @@ observed values.
    §6.1) MUST equal the verdict's declared `ruleset_content_hash` when present.
    When the verdict declares no anchor (pure legacy v1, §10), there is no anchor
    to check; the verifier MUST NOT invent one, and MAY note the computed hash
-   for the record. (This mode has no `--allow-legacy` gate: an absent anchor is
+   for the record. This case is NOT a WARNING condition: the §9.6 warning set
+   is exhaustive (absent `files_sha256`, non-canonical wire `inferred_at`), and
+   an absent anchor is reported on the step line.
+   *(Clarified 2026-08-30, T10 — Q9.)* (This mode has no `--allow-legacy` gate: an absent anchor is
    simply unchecked here, since the mode never claims the strength §9.1's opt-in
    guards.)
 6. **Verdict-hash preimage (§7).** The verifier MUST select the preimage by the
@@ -842,8 +1223,12 @@ observed values.
    preimage (§7.2). Any other value MUST be rejected (fail loud, §7.4) — the
    verifier MUST NOT fall back to v1 or v2. For `preimage_version: 2`, a missing
    `inferred_at` or `ruleset_content_hash` MUST be rejected as inconsistent
-   (possible field stripping, §7.4). The recomputed hash MUST reproduce the
-   packaged `verdict_hash`.
+   (possible field stripping, §7.4). Recovering `working_memory_canonical` for
+   the preimage is where §4's two ASCII MUSTs are enforced: a non-ASCII fact
+   identifier (an object key) and a non-ASCII string fact value are each a
+   failure of this step, named and reported like any other, never re-encoded
+   or silently passed through. *(Clarified 2026-08-30, T10 — R1-A C-2.)* The
+   recomputed hash MUST reproduce the packaged `verdict_hash`.
 7. **External anchor (§9.3).** If `--expected-verdict-hash` is supplied, the
    recomputed hash MUST equal it (compared case-insensitively, §2); a mismatch
    is a failure and MUST be reported as "internally consistent but does NOT
@@ -857,7 +1242,10 @@ record a WARNING and MUST NOT treat it as a failure — the preimage re-formats
 the value per §7.3 (B-5). Warnings — this one and the absent-`files_sha256`
 WARNING of step 2 — are collected as the checks run and printed as a block after
 the step lines, not interleaved with them; their relative order within that
-block is not binding. A conforming verifier SHOULD also bound its resource use
+block is not binding. The terminal outcome token is printed after the warning
+block and **before** the honest-scope statement; a script that reads the token
+MUST match it as a line, not as the last line of the output.
+*(Clarified 2026-08-30, T10 — Q2.)* A conforming verifier SHOULD also bound its resource use
 over adversarial packages (the reference implementation caps each file at 10 MiB
 and the package at 8192 files, failing loud past either).
 
@@ -892,7 +1280,11 @@ confirmations, warnings, terminal tokens, and errors alike. The rationale is
 concrete: downstream shell tooling pattern-matches the substring `VERIFIED` as a
 strong pass, so leaking it from a weak check would misreport the result. The
 reference CLI routes every line through a boundary sanitizer that rewrites
-`VERIFIED` to `VERIF[REDACTED]`.
+`VERIFIED` to `VERIF[REDACTED]`. The match is case-INSENSITIVE (`Verified`,
+`verified` and `VeRiFiEd` are all rewritten to `VERIF[REDACTED]`), it covers
+every line of a `verify-package` surface including error text, and an
+implementation SHOULD print, once, a legend explaining the mask when it
+actually reached the output. *(Clarified 2026-08-30, T10 — Q15.)*
 
 **Honest-scope statement (printed on every terminal outcome).** On success and
 on failure alike, the reference tooling prints a scope statement to the effect

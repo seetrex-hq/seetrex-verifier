@@ -1,0 +1,71 @@
+# The identifier list of the session review ledger, mirrored INTO the crate.
+#
+# The ledger itself is a working document of the project and is not part of
+# the public export; only these identifiers are, so that the link between a
+# corpus case and the divergence it was written for survives the export and
+# can be checked by a test instead of by prose.
+#
+# Two sections. [corpus-backed] identifiers name a divergence a verifier can
+# get WRONG at run time, so each of them MUST be carried by at least one
+# corpus case (`# gap: <id>` in the case's expected.txt).  [text pins]
+# identifiers name a gap the specification closed with a sentence that no
+# package can exercise -- a CLI shape, a stream, an exit code the corpus
+# cannot reach, an appendix -- so they need no case.
+#
+# `intent_spec_gaps_have_cases.rs` enforces both directions: no corpus case
+# may carry an identifier missing from this file, and no identifier whose
+# family is corpus-testable may be listed without a case.
+#
+# Added by fix-pack R3: SPEC-GAP-4.1-date-2 (signed year) and
+# SPEC-GAP-4.1-datetime-3 (colon-less +HHMM offset).
+# SPEC-GAP-4.1-string was introduced by fix-pack R1 with the String paragraph.
+
+[corpus-backed]
+DIV-01
+DIV-02
+DIV-03
+DIV-04
+DIV-05
+DIV-06
+DIV-07
+DIV-08
+DIV-09
+DIV-10
+SPEC-GAP-4-ascii
+SPEC-GAP-4.1-date
+SPEC-GAP-4.1-date-2
+SPEC-GAP-4.1-datetime
+SPEC-GAP-4.1-datetime-2
+SPEC-GAP-4.1-datetime-3
+SPEC-GAP-4.1-duration
+SPEC-GAP-4.1-duration-2
+SPEC-GAP-4.1-money
+SPEC-GAP-4.1-money-2
+SPEC-GAP-4.1-string
+SPEC-GAP-4.1-third-state
+SPEC-GAP-7.3-LEAP
+SPEC-GAP-Q3
+SPEC-GAP-Q5
+SPEC-GAP-Q7
+SPEC-GAP-Q8
+SPEC-GAP-Q10
+SPEC-GAP-Q11
+SPEC-GAP-Q12
+SPEC-GAP-Q13
+SPEC-GAP-Q14
+SPEC-GAP-Q15
+
+[text pins]
+SPEC-GAP-8.1-VOCAB
+SPEC-GAP-9.3
+SPEC-GAP-9.6-ASCII
+SPEC-GAP-9.6-CLI
+SPEC-GAP-9.6-EXIT2
+SPEC-GAP-9.6-STREAM
+SPEC-GAP-A0
+SPEC-GAP-Q1
+SPEC-GAP-Q2
+SPEC-GAP-Q4
+SPEC-GAP-Q6
+SPEC-GAP-Q9
+SPEC-GAP-Q16

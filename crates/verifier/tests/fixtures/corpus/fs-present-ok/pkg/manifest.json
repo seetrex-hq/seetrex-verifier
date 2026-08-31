@@ -1,0 +1,21 @@
+{
+  "package_format_version": 2,
+  "tenant_id": "f9b8de44-3906-4d5c-96b9-67de044f659c",
+  "verdict_id": "cf26f538-cc98-4ac1-8591-7caba28e8f03",
+  "verdict_hash": "93bcd10fd82ae721c478130b35c2c2c9030cbe2dec02e0c495254f7cbee1af69",
+  "chain_prev_hash": null,
+  "chain_hash": "ee6879123d5b8b67267e740ca93bfba1d543892177604b9742791b84bebf5a3e",
+  "replay_token": "-bjeRDkGTVyWuWfeBE9lnM8m9TjMmErBhZF8q6KOjwOTvNEP2CrnIcR4Ews1wsLJAwy-LewC4MSVJU98vuGvaQ",
+  "appended_at": "2026-07-20T12:51:12.940813+00:00",
+  "files": [
+    "verdict.json",
+    "ruleset.json",
+    "evidence/762e8074-96f5-4764-aa59-aa3c6fb92a7e.json",
+    "manifest.json"
+  ],
+  "files_sha256": {
+    "evidence/762e8074-96f5-4764-aa59-aa3c6fb92a7e.json": "6f75dc46153fd1486aaafe37bb6daf5846159602ca53db6275fcbe5915b7591f",
+    "ruleset.json": "91633c6a7d8ab17a5f24abd0ef6602233c3c4b73949eb624924b9da54f1a450c",
+    "verdict.json": "cd7bfd1eb42680c51775820288d5d3d0426da504673f9de793bde6bfef06bc01"
+  }
+}

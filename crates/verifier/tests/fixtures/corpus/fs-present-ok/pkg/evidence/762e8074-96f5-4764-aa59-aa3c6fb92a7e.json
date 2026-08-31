@@ -1,0 +1,14 @@
+{
+  "canonical_blob_key": null,
+  "canonical_blob_size_bytes": null,
+  "canonical_inline": "{\"bomFormat\":\"CycloneDX\",\"components\":[{\"name\":\"example-lib\",\"purl\":\"pkg:generic/example-lib@1.2.3\",\"type\":\"library\",\"version\":\"1.2.3\"},{\"name\":\"example-utils\",\"purl\":\"pkg:generic/example-utils@0.4.0\",\"type\":\"library\",\"version\":\"0.4.0\"}],\"metadata\":{\"component\":{\"name\":\"example-service\",\"type\":\"application\",\"version\":\"1.0.0\"}},\"specVersion\":\"1.5\"}",
+  "canonical_kind": "inline",
+  "category": "sbom",
+  "contains_pii_flag": false,
+  "content_hash": "b0cbaec4eb37028beb657057ecaf50f58d1364f3b6064d9faa3888e2b77bc980",
+  "derived_facts": [],
+  "id": "762e8074-96f5-4764-aa59-aa3c6fb92a7e",
+  "ingested_at": "2026-07-20T12:51:01.286077+00:00",
+  "source_id": "example.cyclonedx_sbom.v1",
+  "tenant_id": "f9b8de44-3906-4d5c-96b9-67de044f659c"
+}

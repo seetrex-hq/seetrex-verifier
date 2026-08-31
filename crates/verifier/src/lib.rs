@@ -68,6 +68,7 @@ pub mod canonical;
 pub mod chain;
 pub mod chain_export;
 pub mod checkpoint;
+pub mod cli_render;
 pub mod evidence;
 pub mod hash;
 pub mod merkle;

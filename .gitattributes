@@ -1,0 +1,5 @@
+# Line-ending policy for this repository.
+#
+# Enforce LF for every text file so that a clone on any operating system
+# yields the same bytes this release was built, hashed and signed from.
+* text=auto eol=lf

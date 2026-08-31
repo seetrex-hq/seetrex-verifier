@@ -1,0 +1,6 @@
+token=
+exit=1
+class=FAIL
+# spec: 4. Canonical value forms
+# gap: DIV-10
+# gap: SPEC-GAP-4-ascii

@@ -1,0 +1,12 @@
+token=SELF-CONSISTENT (unanchored)
+exit=4
+class=PASS_UNANCHORED
+# spec: 9.6 Package integrity verification (`verify-package`)
+# gap: SPEC-GAP-Q15
+# note: 9.6 obliges the reserved-token sanitizer on EVERY line, not only on the failing
+# note: ones. This package plants `verified` in a file name AND in `control_id`, but
+# note: declares the file, so the run PASSES. `sanitize=ci` then asserts that the
+# note: passing output carries no `verified` case-insensitively once the masks are
+# note: removed -- the same obligation the FAIL twin
+# note: (`reserved-token-lowercase-filename`) checks on the failing path.
+sanitize=ci

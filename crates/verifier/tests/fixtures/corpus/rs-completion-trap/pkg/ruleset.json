@@ -1,0 +1,183 @@
+{
+  "ruleset_id": "cra-art13-vulnerability-handling",
+  "framework": "CRA",
+  "article": "13",
+  "control": "vulnerability_handling",
+  "version": 2,
+  "engine_semantic_version_floor": 4,
+  "doc": "CRA Regulation (EU) 2024/2847 Article 13 §8 (Obligations of manufacturers) + Annex I Part II point (1)/(2)/(5) — vulnerability handling. NOTE (2026-07-01): `ruleset_id` and file previously named `cra-art14-*` reflecting the CRA draft numbering (Commission proposal COM/2022/454, Sep 2022); renamed to `cra-art13-*` in Charter α A.1.5 after cross-check against the final OJ text of Reg. UE 2024/2847 (published 20 Nov 2024). Article 14 in the final text regulates 'Notification of actively exploited vulnerabilities' (CSIRT+ENISA timelines 24h/72h/14d), NOT the SBOM+SLA+remediation vulnerability handling procedures encoded here. Sprint 1 thin-slice scope: SBOM presence + format + vulnerability scan freshness + remediation policy SLA + count of critical vulnerabilities open beyond the 7-day SLA. Three verdicts (SATISFIED / AT_RISK / VIOLATED); bucket layout on the open-criticals dimension: count==0 -> SATISFIED, 1<=count<3 -> AT_RISK (closed on the low end, open on the high end so fractional counts in [1,3) all land in AT_RISK), count>=3 -> VIOLATED. FRESHNESS SEMANTICS (v2, F0 2026-07-10): vuln_scan.age_hours is the age in whole hours of the scan-execution timestamp attested INSIDE the report content (trivy CreatedAt, sysdig info.scanTime, veracode max(last_seen_date)); the system envelope (ingestion/request time) NEVER feeds it — a report carrying no in-content signal leaves the fact ABSENT, evidence_complete unreachable, and the outcome is a disclosed non-verdict, never a fabricated one. vuln_scan.age_basis records WHICH in-content signal produced the age ('scan_native' | 'finding_last_seen') and is materialized into the verdict canonical via the two descriptive producer rules CRA.Art13.record_freshness_basis_scan_native / CRA.Art13.record_freshness_basis_finding_last_seen (priority 50, consequents CRA.Art13.freshness_basis_*) — descriptive leaves that never gate any verdict; the containment is enforced structurally by the descriptive-facts walker test. Inputs are expected to be non-negative integers OR non-negative floats >=1 inside the AT_RISK range. Counts in the open intervals (0,1) AND negative AND NaN produce NO verdict (silent unsatisfiability by design); the connector contract (T5) is responsible for rejecting those before they reach the engine — the ruleset cannot defend against malformed inputs without polluting every rule's antecedents. VIOLATED is emitted by its own rule (criticals_many path) rather than via absence of SATISFIED so that downstream consumers (T6 API, T8 CLI replay) can pattern-match the verdict directly without enumerating the failure space. Engine evaluation order: derived facts (priority 90-100) fire before verdict rules (priority 50), per the priority-descending discipline pinned at ENGINE_SEMANTIC_VERSION >= 4.",
+  "facts_consumed": [
+    "sbom.present",
+    "sbom.format",
+    "vuln_scan.age_hours",
+    "vuln_scan.age_basis",
+    "vuln_critical_open_over_7d.count",
+    "remediation_policy.critical_sla_days"
+  ],
+  "verdicts_emitted": ["SATISFIED", "AT_RISK", "VIOLATED"],
+  "rules": [
+    {
+      "id": "CRA.Art13.evidence_present",
+      "name": "CRA Art. 13 — evidence present (SBOM + fresh scan + SLA policy)",
+      "antecedents": [
+        "sbom.present",
+        "vuln_scan.age_hours",
+        "remediation_policy.critical_sla_days"
+      ],
+      "conditions": [
+        {
+          "fact_id": "sbom.format",
+          "operator": "In",
+          "value": ["CycloneDX", "SPDX"]
+        },
+        {
+          "fact_id": "vuln_scan.age_hours",
+          "operator": "Le",
+          "value": 24.0
+        },
+        {
+          "fact_id": "remediation_policy.critical_sla_days",
+          "operator": "Le",
+          "value": 7.0
+        }
+      ],
+      "consequent": "CRA.Art13.evidence_complete",
+      "consequent_value": true,
+      "priority": 100
+    },
+    {
+      "id": "CRA.Art13.criticals_zero",
+      "name": "CRA Art. 13 — zero critical vulnerabilities open beyond SLA",
+      "antecedents": ["vuln_critical_open_over_7d.count"],
+      "conditions": [
+        {
+          "fact_id": "vuln_critical_open_over_7d.count",
+          "operator": "Eq",
+          "value": 0.0
+        }
+      ],
+      "consequent": "CRA.Art13.criticals_zero",
+      "consequent_value": true,
+      "priority": 90
+    },
+    {
+      "id": "CRA.Art13.criticals_few",
+      "name": "CRA Art. 13 — 1 to <3 critical vulnerabilities open beyond SLA (borderline)",
+      "antecedents": ["vuln_critical_open_over_7d.count"],
+      "conditions": [
+        {
+          "fact_id": "vuln_critical_open_over_7d.count",
+          "operator": "Ge",
+          "value": 1.0
+        },
+        {
+          "fact_id": "vuln_critical_open_over_7d.count",
+          "operator": "Lt",
+          "value": 3.0
+        }
+      ],
+      "consequent": "CRA.Art13.criticals_few",
+      "consequent_value": true,
+      "priority": 90
+    },
+    {
+      "id": "CRA.Art13.criticals_many",
+      "name": "CRA Art. 13 — 3 or more critical vulnerabilities open beyond SLA (systemic)",
+      "antecedents": ["vuln_critical_open_over_7d.count"],
+      "conditions": [
+        {
+          "fact_id": "vuln_critical_open_over_7d.count",
+          "operator": "Ge",
+          "value": 3.0
+        }
+      ],
+      "consequent": "CRA.Art13.criticals_many",
+      "consequent_value": true,
+      "priority": 90
+    },
+    {
+      "id": "CRA.Art13.verdict_satisfied",
+      "name": "CRA Art. 13 — SATISFIED (evidence present and zero open criticals)",
+      "antecedents": [
+        "CRA.Art13.evidence_complete",
+        "CRA.Art13.criticals_zero"
+      ],
+      "conditions": [],
+      "consequent": "CRA.Art13.verdict_SATISFIED",
+      "consequent_value": "SATISFIED",
+      "priority": 50
+    },
+    {
+      "id": "CRA.Art13.verdict_at_risk",
+      "name": "CRA Art. 13 — AT_RISK (evidence present but 1-2 open criticals)",
+      "antecedents": [
+        "CRA.Art13.evidence_complete",
+        "CRA.Art13.criticals_few"
+      ],
+      "conditions": [],
+      "consequent": "CRA.Art13.verdict_AT_RISK",
+      "consequent_value": "AT_RISK",
+      "priority": 50
+    },
+    {
+      "id": "CRA.Art13.verdict_violated",
+      "name": "CRA Art. 13 — VIOLATED (3 or more open criticals; systemic failure)",
+      "antecedents": ["CRA.Art13.criticals_many"],
+      "conditions": [],
+      "consequent": "CRA.Art13.verdict_VIOLATED",
+      "consequent_value": "VIOLATED",
+      "priority": 50
+    },
+    {
+      "id": "CRA.Art13.record_freshness_basis_scan_native",
+      "name": "CRA Art. 13 — record freshness basis: scan-native execution timestamp (descriptive, never gates)",
+      "antecedents": ["vuln_scan.age_basis"],
+      "conditions": [
+        {
+          "fact_id": "vuln_scan.age_basis",
+          "operator": "Eq",
+          "value": "scan_native"
+        }
+      ],
+      "consequent": "CRA.Art13.freshness_basis_scan_native",
+      "consequent_value": true,
+      "priority": 50
+    },
+    {
+      "id": "CRA.Art13.record_freshness_basis_finding_last_seen",
+      "name": "CRA Art. 13 — record freshness basis: max finding last_seen date (descriptive, never gates)",
+      "antecedents": ["vuln_scan.age_basis"],
+      "conditions": [
+        {
+          "fact_id": "vuln_scan.age_basis",
+          "operator": "Eq",
+          "value": "finding_last_seen"
+        }
+      ],
+      "consequent": "CRA.Art13.freshness_basis_finding_last_seen",
+      "consequent_value": true,
+      "priority": 50
+    }
+  ],
+  "regulatory_source": {
+    "regulation": "Regulation (EU) 2024/2847",
+    "article": "Article 13",
+    "paragraph": "§8",
+    "url_official": "https://eur-lex.europa.eu/eli/reg/2024/2847/oj",
+    "guidance_refs": [
+      "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202402847",
+      "https://digital-strategy.ec.europa.eu/en/policies/cra-summary"
+    ],
+    "interpretation_caveats": [
+      "Article 13 §8 requires manufacturers to ensure that 'vulnerabilities of that product... are handled effectively and in accordance with the essential cybersecurity requirements set out in Part II of Annex I'. 'Effectively' is not defined numerically in the CRA text — this ruleset instantiates the SLA as remediation_policy.critical_sla_days <= 7 (industry practice for CRITICAL severity) and evidence of a vulnerability scan freshness of <= 24h. Alternative SLAs (e.g. 30 days for medium-severity) are compatible with 'effective' but out of scope for this thin-slice ruleset.",
+      "Annex I Part II point (1) references SBOM: 'identify and document the vulnerabilities and components contained in products with digital elements, including by drawing up a software bill of materials in a commonly used and machine-readable format covering at the very least the top-level dependencies of the products'. This ruleset accepts CycloneDX and SPDX as the 'commonly used and machine-readable' formats; other formats (e.g. proprietary XML) would require ruleset extension.",
+      "Annex I Part II point (2) requires manufacturers to 'address and remediate vulnerabilities without delay, including by providing security updates'. Point (5) requires 'a coordinated vulnerability disclosure policy' referenced from Article 13 §24. Additional Part II points (3), (4), (6), (7), (8) list obligations (public info disclosure, security testing, secure updates, secure-by-default configuration, remediation transparency) not codified as rules in this thin-slice — they are documented in facts_consumed as descriptive evidence for the CCO to review in Fase C Control Matrix UI.",
+      "NAMING TRACEBACK: this ruleset was originally created in Sprint 1 T4 and productivised in Sprint 3 D2 as 'cra-art14-vulnerability-handling' — reflecting the CRA draft (COM/2022/454, Sep 2022) numbering. The final CRA text (Reg. UE 2024/2847, OJ 20 Nov 2024) shifted the vulnerability-handling obligations to Article 13 + Annex I Part II, and Article 14 to notification of actively exploited vulnerabilities (CSIRT+ENISA 24h/72h/14d timelines) — a semantically different regulatory duty. Charter α A.1.5 (2026-07-01) renamed the ruleset_id + file + all live callsites to 'cra-art13-*' after cross-check against EUR-Lex. See tasks/products/compliance/CHECKPOINT_A15_ART14_TO_ART13_RENAME.md + lesson L42 (tasks/lessons.md) for full traceback.",
+      "FRESHNESS DESCOPE (v2, F0 2026-07-10): formats with no in-content scan-execution signal cannot reach evidence_complete — snyk CLI (always: its report carries no scan-execution timestamp), semgrep CLI (its SARIF invocations object carries only executionSuccessful, no startTimeUtc — verified empirically 2026-07-10 against the real semgrep/semgrep:latest producer), veracode reports whose findings include none that are datable, and trivy reports without CreatedAt or carrying the Go zero-time sentinel 0001-01-01T00:00:00Z. For those formats vuln_scan.age_hours is ABSENT by design (never fabricated); sustained freshness for them requires the deferred attested wrapper (DF-FRESH-1).",
+      "TRUNCATION: vuln_scan.age_hours is a whole-hours truncation of the attested timestamp age — a scan aged 24h59m yields age_hours=24 and the Le 24.0 gate passes; the effective wall-clock boundary of the freshness gate is therefore strictly below 25h, not 24h.",
+      "ONE-REPORT-PER-INFERENCE: an inference request carrying more than one Evidence row of category vuln_scan is rejected fail-loud with 400 BadRequest (NOT the benign insufficient_evidence path) — the freshness and the counts of a verdict must derive from the SAME attested report; cross-report composition (borrowing a fresh timestamp from report A while the counts come from report B) is structurally impossible.",
+      "FRESHNESS LIMIT: a fresh scan-execution timestamp attests WHEN the scanner ran, not that the scanner's vulnerability database was current at that moment — 'fresh scan' does not imply 'fresh vuln-DB of the scanner'. That dimension is not verified by this ruleset.",
+      "TARGET-BINDING LIMIT (debt family DF-FRESH): 'fresh scan' does not imply 'scan of the correct product' — no ruleset today binds the scan target to the product/SBOM under assessment; a real scanner run over an empty directory yields a fresh attested timestamp plus zero counts (the evidence stays WORM-inspectable and attributable via its artifact name, but the binding is not verified). Disclosed debt; trigger: first auditor/prospect requiring target binding."
+    ]
+  }
+}
