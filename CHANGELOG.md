@@ -14,13 +14,16 @@ entry's release date is the date of its signed tag.
 
 ## [Unreleased]
 
-The two bullets below are kept here on purpose rather than moved into a
-release entry. The offline page is built by a release job from the vendor's
-tree, not from the crate, and no release — `0.3.6` or `0.3.7` — has carried
-one yet: no `.crate` of this crate contains an `.html`, and the GitHub release
-of `seetrex-verifier-v0.3.6` carries four assets, the two linux-musl
-executables and the `SHA256SUMS`/`SHA256SUMS.asc` pair. They move to the entry
-of the first release that does carry the page.
+The two bullets under `### Added` below are kept here on purpose rather than
+moved into a release entry, and that applies to them alone: the `### Fixed`
+bullets beside them record work done on this document after `0.3.7` was
+published and belong to no later release. The offline page is built by a
+release job from the vendor's tree, not from the crate, and no release —
+`0.3.6` or `0.3.7` — has carried one yet: no `.crate` of this crate contains
+an `.html`, and the GitHub releases of `seetrex-verifier-v0.3.6` and
+`seetrex-verifier-v0.3.7` carry four assets each, the two linux-musl
+executables and the `SHA256SUMS`/`SHA256SUMS.asc` pair. The two `### Added`
+bullets move to the entry of the first release that does carry the page.
 
 ### Added
 - A signed release may now carry an OFFLINE BROWSER PAGE,
@@ -44,6 +47,27 @@ of the first release that does carry the page.
   release-signing key as the prebuilt executables. Publication is a separate,
   explicit act: the dispatch defaults to a dry run.
 
+### Fixed
+- 2026-09-01: the `0.3.7` entry below dates itself `2026-09-01` and says that
+  date «was written before that tag existed». The tag exists now, and the
+  date holds: the heading date of the `0.3.7`
+  entry equals the UTC day of the tagger instant of
+  `seetrex-verifier-v0.3.7`, so the heading needed no amendment. The instant
+  itself is pinned in the auditor kit, section 2.2, and this file does not
+  restate it. The entry's own sentence about amending the heading stays below
+  as the rule it states, not as a debt.
+- 2026-09-01: the comparison the `0.3.7` entry below calls owed — the one
+  between the two PUBLISHED artifacts, rather than between the tree and the
+  previous tarball — has been made, and it is empty. Both `.crate` files were
+  downloaded from crates.io, each checked against the sha256 the registry
+  reports, and unpacked outside any repository. At the tarball root,
+  `diff -r src/bin` and `diff tests/bin_e2e.rs` between the two published
+  tarballs exit `0` with no output. So «existing commands, formats and exit
+  codes are unchanged» is a measurement of the published channel and no longer
+  a prediction about it. The tarball pair, its file counts and the one shared
+  path under `src/` that differs are pinned in the auditor kit, appendix A,
+  which records that diff in full; this file names none of those figures.
+
 ## [seetrex-verifier 0.3.7] — 2026-09-01
 
 The suite is green from every tree this channel publishes. `0.3.6` shipped it
@@ -65,7 +89,8 @@ Once `0.3.7` is itself on crates.io the same comparison is owed between the two
 published artifacts: unpack both tarballs and `diff -r` those two paths at the
 tarball ROOT (inside a `.crate` there is no `crates/verifier/` prefix), the way
 appendix A of `docs/AUDITOR_KIT.md` compares them. An empty diff is what this
-entry predicts, and the recapture is what confirms it. What the two
+entry predicted, and the recapture made it: both comparisons exit `0` and print
+nothing, recorded under `[Unreleased]` above. What the two
 trees actually print is measured against the published channel after this
 release, not before, and `docs/AUDITOR_KIT.md` section 2.2 says which
 measurement it is showing.
@@ -98,11 +123,14 @@ measurement it is showing.
 - The `0.3.6` heading below dated that entry `2026-08-30`; its signed tag was
   made `2026-08-31T10:45:28Z`, and this preamble says an entry's release date
   is the date of its signed tag. Corrected here. The date on THIS entry's own
-  heading is the same kind of claim and is not yet measured: it is the UTC day
-  the `seetrex-verifier-v0.3.7` tag is cut, written before that tag exists. If
-  the tag is signed on another day, the heading is amended to the tagger's day
-  before the snapshot that carries it is pushed, so that no published copy of
-  this file dates an entry by anything but its signed tag.
+  heading is the same kind of claim and was written before that tag existed: it
+  is the UTC day the `seetrex-verifier-v0.3.7` tag was cut. The rule it commits
+  to is that if the tag were signed on another day, the heading would be amended
+  to the tagger's day before the snapshot carrying it is pushed, so that no
+  published copy of this file dates an entry by anything but its signed tag. The
+  tag was signed on the UTC day this heading already carried, so nothing was
+  amended; the tagger instant itself is pinned in the auditor kit, section 2.2,
+  and the record of the check is under `[Unreleased]` above.
 - The `0.3.6` entry below recorded the in-memory package seam under
   `[Unreleased]`, although the `.crate` published as `0.3.6` already shipped
   it, so the CHANGELOG published at that tag credited the release with less
