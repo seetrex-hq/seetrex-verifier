@@ -54,6 +54,28 @@ const ALLOWED_ESCAPES: [&str; 3] = [
     "/etc/passwd",
 ];
 
+/// The marker `cargo package` writes beside the manifest of every crate it
+/// builds, and the one POSITIVE proof that this binary is running from an
+/// unpacked `.crate`. Same criterion as `tests/common/mod.rs`, re-derived
+/// here because this guard must keep working from the tarball, which is
+/// exactly where the classification matters.
+const PACKAGING_MARKER: &str = "Cargo.toml.orig";
+
+/// How a file DECLARES that it can survive the absence of the document it
+/// escapes the crate to read: it either calls the one skip helper, or it
+/// spells the one skip line that helper fixes.
+///
+/// The second form exists for `src/sbom/compare.rs` alone: a `#[cfg(test)]`
+/// module inside `src/` cannot reach `tests/common/mod.rs`, so it writes the
+/// line itself, and `crates/witness/tests/intent_skip_spelling_is_single.rs`
+/// holds the two spellings byte-identical.
+///
+/// What this pair CANNOT see is whether the skip actually covers the read —
+/// a file that skips in one guard and opens the document in another matches
+/// this check. That gap is closed by measurement rather than by text: the
+/// suite is run from the unpacked `.crate`, where an uncovered read panics.
+const SKIP_DISCIPLINE: [&str; 2] = ["common::skip(", "skipped [{tree}]: {reason}"];
+
 /// The two source roots of this crate, both of which ship in the export.
 fn scanned_roots() -> [PathBuf; 2] {
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -249,10 +271,30 @@ fn rust_sources(dir: &Path, found: &mut Vec<PathBuf>) {
 ///   of `scripts/export_public.sh` -- `cargo test --locked` in the isolated
 ///   staging tree -- panicked in a dozen tests and the export was
 ///   un-runnable, with nothing in the private suite going red to say so.
+///   0.3.7 added the second half of the same story, and it is why this test
+///   now has a branch. From an unpacked `.crate` the allowlisted escapes
+///   CANNOT resolve -- `cargo package` carries nothing from outside the
+///   package directory -- so "the target must exist" made this guard red in
+///   the one tree whose self-containment it certifies, which is what 0.3.6
+///   shipped (`docs/AUDITOR_KIT.md` section 2.2, the fifth red target). In a
+///   packaged tree the obligation therefore CHANGES SHAPE instead of
+///   disappearing: it stops asking "does the target exist", whose answer is a
+///   known no, and asks the question that still has teeth there -- does every
+///   file that leaves the crate for that document go through the skip
+///   discipline, so that it announces the absence instead of panicking on it.
+/// LIMIT DECLARED: the branch is taken only on POSITIVE proof of packaging
+///   (`Cargo.toml.orig`, which no source checkout has), so a source tree with
+///   `docs/` deleted stays red; and `SKIP_DISCIPLINE` matches a text per FILE,
+///   not per read, so a file that skips in one guard and opens the document in
+///   another satisfies it. What closes that is measurement, not text: the
+///   suite is run from the unpacked tarball, where an uncovered read panics.
 /// EXPIRES IF: the export stops running the crate's test suite in isolation,
-///   which is the property this guard exists to protect. Adding an entry to
-///   `ALLOWED_ESCAPES` is allowed only for a path the export allowlist ships,
-///   and the assertion below re-measures exactly that.
+///   which is the property this guard exists to protect; or the specification
+///   documents start travelling inside the `.crate`, at which point the
+///   packaged branch has nothing to excuse and is deleted rather than
+///   widened. Adding an entry to `ALLOWED_ESCAPES` is allowed only for a path
+///   the export allowlist ships, and the assertion below re-measures exactly
+///   that.
 #[test]
 fn test_intent_public_crate_tests_do_not_read_outside_the_crate() {
     let token = escape_token();
@@ -308,17 +350,66 @@ fn test_intent_public_crate_tests_do_not_read_outside_the_crate() {
     // actually resolve from this crate, which is what proves it is exported
     // alongside the source rather than merely tolerated by this guard. The
     // traversal payload is a string literal and has no file to check.
+    //
+    // Except in ONE tree, and it is the tree this whole guard is about: an
+    // unpacked `.crate`. `cargo package` cannot carry a file from outside the
+    // package directory, so `docs/` legitimately does not travel and the
+    // documents legitimately do not resolve. Demanding they resolve there
+    // would make this guard red in the very tree whose self-containment it
+    // certifies — which is what 0.3.6 shipped (`docs/AUDITOR_KIT.md` §2.2).
+    //
+    // So the obligation changes shape rather than disappearing. In a packaged
+    // tree the guard stops asking "does the target exist" (the answer is a
+    // known no) and asks the question that still has teeth there: does every
+    // file that leaves the crate for that document go through the SKIP
+    // DISCIPLINE — one call to `common::skip`, or the one spelling of the skip
+    // line it fixes? A reader that simply opens the document panics from the
+    // tarball, and that is the defect being prevented.
+    let packaged = crate_root.join(PACKAGING_MARKER).is_file();
     for allowed in ALLOWED_ESCAPES {
         if allowed == "/etc/passwd" {
             continue;
         }
-        let resolved = crate_root.join(format!("{token}{allowed}"));
+        let escape = format!("{token}{allowed}");
+        let resolved = crate_root.join(&escape);
+        if resolved.is_file() {
+            continue;
+        }
         assert!(
-            resolved.is_file(),
-            "ALLOWED_ESCAPES lists `{token}{allowed}`, which does not exist \
+            packaged,
+            "ALLOWED_ESCAPES lists `{escape}`, which does not exist \
              at {}. An escape is allowed only while the export ships its \
              target.",
             resolved.display()
+        );
+
+        let mut undisciplined = Vec::new();
+        for source in &sources {
+            let text = fs::read_to_string(source)
+                .unwrap_or_else(|error| panic!("read {}: {error}", source.display()));
+            if !text.contains(&escape) {
+                continue;
+            }
+            if SKIP_DISCIPLINE.iter().any(|token| text.contains(token)) {
+                continue;
+            }
+            undisciplined.push(
+                source
+                    .strip_prefix(&crate_root)
+                    .unwrap_or(source)
+                    .display()
+                    .to_string()
+                    .replace('\\', "/"),
+            );
+        }
+        assert!(
+            undisciplined.is_empty(),
+            "these files read `{escape}`, which does not travel inside the \
+             `.crate` this test is running from, and none of them names the \
+             skip discipline ({}). From the tarball they do not skip — they \
+             panic on a file that could not be packaged:\n{}",
+            SKIP_DISCIPLINE.join(" / "),
+            undisciplined.join("\n")
         );
     }
 }

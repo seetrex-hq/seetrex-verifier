@@ -1139,6 +1139,7 @@ fn render_diff(diff: &FieldDiff) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::io::Write;
     use std::path::{Path, PathBuf};
 
     use crate::sbom::{cargo, SubjectPurl};
@@ -1152,8 +1153,61 @@ mod tests {
     /// The subject the specification fixes for its reference vector.
     const REFERENCE_SUBJECT: &str = "pkg:cargo/demo-app@0.2.0";
 
+    /// The marker `cargo package` writes beside the manifest of every crate
+    /// it builds, and the only POSITIVE proof available that this binary is
+    /// running from an unpacked `.crate` rather than from a source checkout.
+    ///
+    /// It is the same criterion `tests/common/mod.rs` uses. This module
+    /// re-derives it instead of sharing it because a `tests/` subdirectory is
+    /// not a module of the library: the unit tests inside `src/` cannot reach
+    /// that file, and the integration targets cannot reach these tests.
+    const PACKAGING_MARKER: &str = "Cargo.toml.orig";
+
+    /// The skip line the guards of this module print when the specification
+    /// did not travel, in the ONE spelling `tests/common/mod.rs` fixes, so
+    /// that an auditor running the crate from the tarball can COUNT what this
+    /// route does not measure.
+    ///
+    /// The reason names THIS obligation -- the reference vector -- rather
+    /// than the one `tests/intent_sbom_spec_matches_code.rs` skips against the
+    /// same document, so the census distinguishes them.
+    const SPEC_ABSENT_REASON: &str =
+        "the normative reference vector of the canonical SBOM specification is not compared with \
+         the code: `cargo package` cannot carry a file from outside the package directory, so \
+         docs/SPEC_SBOM_CANONICAL_V1.md does not travel inside the .crate";
+
     fn spec_path() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join(SPEC_RELATIVE_PATH)
+    }
+
+    /// Whether the specification is absent BECAUSE this is an unpacked
+    /// `.crate`, printing the skip line when it is.
+    ///
+    /// The packaging is asserted, never assumed. In every OTHER tree a
+    /// missing document is a hard failure exactly as it always has been: a
+    /// source checkout without `docs/` is broken, and these tests certify the
+    /// comparison code against the document's NORMATIVE reference vector, so
+    /// passing quietly is the worst outcome available.
+    fn spec_absent_because_packaged() -> bool {
+        let path = spec_path();
+        if path.is_file() {
+            return false;
+        }
+        let marker = Path::new(env!("CARGO_MANIFEST_DIR")).join(PACKAGING_MARKER);
+        assert!(
+            marker.is_file(),
+            "the canonical SBOM specification is not at {} and this is not an \
+             unpacked `.crate` ({PACKAGING_MARKER} is not beside the manifest). \
+             These tests certify the comparison against the document's \
+             normative reference vector; with no document there is nothing to \
+             certify.",
+            path.display()
+        );
+        let tree = "Packaged";
+        let reason = SPEC_ABSENT_REASON;
+        let line = format!("skipped [{tree}]: {reason}\n");
+        let _ = std::io::stderr().write_all(line.as_bytes());
+        true
     }
 
     fn fixture(name: &str) -> Vec<u8> {
@@ -1264,6 +1318,11 @@ mod tests {
     /// that alters the behaviour.
     #[test]
     fn test_intent_reference_vector_is_canonical_and_matches_its_own_projection() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         let bytes = reference_document().into_bytes();
         let document = parse_canonical_sbom(&bytes).expect("the reference vector is canonical");
         let comparison = compare(&document, &reference_projection());
@@ -1305,6 +1364,11 @@ mod tests {
     /// BREAKING change requiring a new projection identifier.
     #[test]
     fn test_intent_pretty_printed_document_is_rejected_as_not_canonical() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         let pretty = serde_json::to_string_pretty(&reference_value())
             .expect("the reference value re-serializes");
         let error = parse_canonical_sbom(pretty.as_bytes())
@@ -1330,6 +1394,11 @@ mod tests {
     /// canonical bytes with no trailing newline.
     #[test]
     fn test_intent_trailing_newline_is_rejected_at_the_end_of_the_canonical_prefix() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         let canonical = reference_document();
         let with_newline = format!("{canonical}\n");
         let error = parse_canonical_sbom(with_newline.as_bytes())
@@ -1358,6 +1427,11 @@ mod tests {
     /// change by the specification's own versioning rule.
     #[test]
     fn test_intent_serial_number_is_rejected_even_in_canonical_form() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         let bytes = mutant(|document| {
             document["serialNumber"] = json!("urn:uuid:00000000-0000-4000-8000-000000000000");
         });
@@ -1381,6 +1455,11 @@ mod tests {
     /// EXPIRES IF: the format stops requiring declared references.
     #[test]
     fn test_intent_dangling_depends_on_is_rejected() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         let ghost = "pkg:cargo/ghost@1.0.0";
         let bytes = mutant(|document| {
             document["dependencies"][0]["dependsOn"]
@@ -1407,6 +1486,11 @@ mod tests {
     /// EXPIRES IF: the format admits a `bom-ref` that is not the purl.
     #[test]
     fn test_intent_bom_ref_other_than_the_purl_is_rejected() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         let bytes = mutant(|document| {
             document["components"][0]["bom-ref"] = json!("pkg:cargo/leaf@9.9.9");
         });
@@ -1438,6 +1522,11 @@ mod tests {
     /// component is swapped for another, the case the next test pins.
     #[test]
     fn test_intent_missing_component_is_reported_as_missing_from_the_document() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         // `leaf@0.1.0` is reachable from no edge of the graph, so removing
         // it leaves every reference resolvable and isolates ONE difference.
         let bytes = mutant(|document| {
@@ -1470,6 +1559,11 @@ mod tests {
     /// MUTANT: comparing only `components.len()`.
     #[test]
     fn test_intent_component_swap_is_not_hidden_by_equal_counts() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         let bytes = mutant(|document| {
             document["components"][0] = json!({
                 "bom-ref": "pkg:cargo/aaa@0.1.0",
@@ -1507,6 +1601,11 @@ mod tests {
     /// a breaking change by the specification's own versioning rule.
     #[test]
     fn test_intent_changed_component_version_is_a_field_difference() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         let bytes = mutant(|document| {
             document["components"][2]["version"] = json!("0.4.0");
         });
@@ -1542,6 +1641,11 @@ mod tests {
     /// MUTANT: ignoring `dependencies` in the comparison.
     #[test]
     fn test_intent_top_level_shrink_is_reported() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         let bytes = mutant(|document| {
             document["dependencies"][0]["dependsOn"]
                 .as_array_mut()
@@ -1583,6 +1687,11 @@ mod tests {
     /// MUTANT: reading the subject out of `metadata.component`.
     #[test]
     fn test_intent_forged_subject_is_reported_against_the_supplied_one() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         let forged = "pkg:cargo/other-app@9.9.9";
         let bytes = mutant(|document| {
             document["metadata"]["component"] = json!({
@@ -1642,6 +1751,11 @@ mod tests {
     /// MUTANT: `byte_identical = self.is_match()`.
     #[test]
     fn test_intent_byte_identity_is_not_derived_from_the_difference_sets() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         // A second graph entry, for a component the document declares:
         // canonical, resolvable, and invisible to every difference set,
         // because the sets compare the SUBJECT's edges.
@@ -1689,6 +1803,11 @@ mod tests {
     /// promoted to a strong verification surface.
     #[test]
     fn test_intent_render_human_is_deterministic_and_sanitizes_the_reserved_token() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         let hostile = format!("pkg:cargo/{RESERVED_TOKEN}@1.0.0");
         let bytes = mutant(|document| {
             // Uppercase sorts before the lowercase purls of the vector, so
@@ -1744,6 +1863,11 @@ mod tests {
     /// MUTANT: print the two purls unconditionally.
     #[test]
     fn test_intent_subject_mismatch_header_names_the_differing_field() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         // The purl is untouched; the `name` beside it is not.
         let bytes = mutant(|document| {
             document["metadata"]["component"]["name"] = json!("renamed-by-another-tool");
@@ -1801,6 +1925,11 @@ mod tests {
     /// module and stating it about the type.
     #[test]
     fn subject_mismatch_naming_no_field_renders_an_honest_line() {
+        // The normative reference vector lives in a document that does
+        // not travel inside the `.crate`; there it is skipped out loud.
+        if spec_absent_because_packaged() {
+            return;
+        }
         let bytes = mutant(|document| {
             document["metadata"]["component"]["name"] = json!("renamed-by-another-tool");
         });

@@ -40,6 +40,12 @@ use seetrex_verifier::sbom::{cargo, SubjectPurl};
 #[allow(dead_code)]
 mod private_tree;
 
+/// The tree classifier, shared with the other travelling guards of this
+/// crate: `docs/SPEC_SBOM_CANONICAL_V1.md` lives two levels up, and two of
+/// the three trees this crate is published into carry it while the third —
+/// an unpacked `.crate` — cannot.
+mod common;
+
 /// The specification, relative to this crate's manifest directory.
 const SPEC_RELATIVE_PATH: &str = "../../docs/SPEC_SBOM_CANONICAL_V1.md";
 
@@ -65,6 +71,50 @@ fn spec_text() -> String {
             path.display()
         )
     })
+}
+
+/// The skip line every guard of this file that needs the document prints,
+/// in the ONE spelling `common::skip` defines, so an auditor running the
+/// crate from the tarball can COUNT what this route does not measure.
+const SPEC_ABSENT_REASON: &str = "the canonical SBOM specification is not confronted with the \
+     code: `cargo package` cannot carry a file from outside the package \
+     directory, so docs/SPEC_SBOM_CANONICAL_V1.md does not travel inside \
+     the .crate";
+
+/// Whether the specification is absent BECAUSE this is an unpacked `.crate`,
+/// printing the skip line when it is.
+///
+/// The packaging is asserted, never assumed (`tests/common/mod.rs` proves it
+/// from `Cargo.toml.orig`). In every OTHER tree a missing document panics
+/// exactly as it always has — a source checkout without `docs/` is broken,
+/// and these guards compare the published document against the code, so
+/// passing quietly is the worst outcome available.
+fn spec_absent_because_packaged() -> bool {
+    let path = spec_path();
+    if path.is_file() {
+        return false;
+    }
+    let tree = common::classify();
+    assert_eq!(
+        tree,
+        common::Tree::Packaged,
+        "the canonical SBOM specification is not at {} and this is not an \
+         unpacked `.crate` (`Cargo.toml.orig` is not beside the manifest). \
+         These guards compare the published document against the code; with \
+         no document there is nothing to compare.",
+        path.display()
+    );
+    common::skip(tree, SPEC_ABSENT_REASON);
+    true
+}
+
+/// The specification text, or `None` in an unpacked `.crate`, where the
+/// document does not travel.
+fn spec_text_or_skip() -> Option<String> {
+    if spec_absent_because_packaged() {
+        return None;
+    }
+    Some(spec_text())
 }
 
 /// The contents of the fenced code block delimited by
@@ -334,7 +384,10 @@ fn describe_difference(produced: &str, expected: &str) -> String {
 /// specification stops printing a normative vector for the cargo ecosystem.
 #[test]
 fn test_intent_spec_vector_is_reproduced_by_the_code() {
-    let spec = spec_text();
+    // The skip line, if any, has already been printed on this test's behalf.
+    let Some(spec) = spec_text_or_skip() else {
+        return;
+    };
     let expected = printed_canonical(&spec);
     let produced = canonical_bytes(&reference_document(&spec));
 
@@ -367,7 +420,10 @@ fn test_intent_spec_vector_is_reproduced_by_the_code() {
 /// deduplication by name.
 #[test]
 fn test_intent_spec_negative_controls_hold() {
-    let spec = spec_text();
+    // The skip line, if any, has already been printed on this test's behalf.
+    let Some(spec) = spec_text_or_skip() else {
+        return;
+    };
     let controls = printed_negative_controls(&spec);
     let mut document = reference_document(&spec);
     let correct = canonical_bytes(&document);
@@ -435,7 +491,10 @@ fn test_intent_spec_negative_controls_hold() {
 /// and into the normative body.
 #[test]
 fn test_intent_spec_property_literals_match_code() {
-    let spec = spec_text();
+    // The skip line, if any, has already been printed on this test's behalf.
+    let Some(spec) = spec_text_or_skip() else {
+        return;
+    };
     let rows = printed_property_rows(&spec);
     assert!(
         rows.len() >= 3,
@@ -512,7 +571,10 @@ fn test_intent_spec_property_literals_match_code() {
 /// mandatory key set differs, which section 9 makes a spec-version change.
 #[test]
 fn test_intent_spec_allowed_top_level_keys_match_code() {
-    let spec = spec_text();
+    // The skip line, if any, has already been printed on this test's behalf.
+    let Some(spec) = spec_text_or_skip() else {
+        return;
+    };
     let allowed = printed_allowed_top_level_keys(&spec);
     let document = reference_document(&spec);
     let mut emitted: Vec<String> = document
@@ -546,7 +608,10 @@ fn test_intent_spec_allowed_top_level_keys_match_code() {
 /// leaving only a hash to check against.
 #[test]
 fn test_intent_spec_sha_literal_is_the_hash_of_the_printed_vector() {
-    let spec = spec_text();
+    // The skip line, if any, has already been printed on this test's behalf.
+    let Some(spec) = spec_text_or_skip() else {
+        return;
+    };
     let printed = printed_canonical(&spec);
 
     assert!(
@@ -678,7 +743,10 @@ fn test_intent_spec_ingest_whitelist_matches_5_4() {
     };
     let keys = ingest_whitelist(&source);
 
-    let spec = spec_text();
+    // The skip line, if any, has already been printed on this test's behalf.
+    let Some(spec) = spec_text_or_skip() else {
+        return;
+    };
     let section = unwrapped(&section_body(&spec, "### 5.4 "));
 
     // The keys the document names, from item 1's own parenthetical.
@@ -747,7 +815,10 @@ fn test_intent_spec_ingest_whitelist_matches_5_4() {
 /// MUTANT: remove the check from either subcommand.
 #[test]
 fn test_intent_spec_subject_type_must_match_kind_is_enforced() {
-    let spec = spec_text();
+    // The skip line, if any, has already been printed on this test's behalf.
+    let Some(spec) = spec_text_or_skip() else {
+        return;
+    };
     let requirement = "The subject purl's type MUST match the lockfile kind";
     let section = unwrapped(&section_body(&spec, "### 5.5 "));
     assert!(
@@ -824,7 +895,10 @@ fn test_intent_spec_subject_type_must_match_kind_is_enforced() {
 /// MUTANT: restore "plus `group` for a namespaced purl" in Appendix A.
 #[test]
 fn test_intent_spec_appendix_a_agrees_about_metadata_component_keys() {
-    let spec = spec_text();
+    // The skip line, if any, has already been printed on this test's behalf.
+    let Some(spec) = spec_text_or_skip() else {
+        return;
+    };
     let appendix = unwrapped(&section_body(&spec, "## Appendix A. Editorial completions"));
 
     // Non-vacuity: the appendix really does discuss the object.
@@ -921,7 +995,10 @@ fn printed_digest_free_schemes(spec: &str) -> BTreeSet<String> {
 ///   add a third scheme to the sentence in 2.1 without touching the code.
 #[test]
 fn test_intent_spec_digest_free_schemes_match_code() {
-    let spec = spec_text();
+    // The skip line, if any, has already been printed on this test's behalf.
+    let Some(spec) = spec_text_or_skip() else {
+        return;
+    };
     let printed = printed_digest_free_schemes(&spec);
     let implemented: BTreeSet<String> = cargo::DIGEST_FREE_SOURCE_SCHEMES
         .iter()
@@ -1333,7 +1410,10 @@ fn scan_denials(doc: &str) -> DenialScan {
 ///   projection mask or rename a component whose name carries the token.
 #[test]
 fn test_intent_spec_reserved_token_obligation_is_scoped_to_verdict_surfaces() {
-    let spec = spec_text();
+    // The skip line, if any, has already been printed on this test's behalf.
+    let Some(spec) = spec_text_or_skip() else {
+        return;
+    };
     let item = printed_reserved_token_item(&spec);
 
     assert!(
@@ -1573,15 +1653,25 @@ fn test_intent_reserved_token_guard_declares_its_denial_list_limit() {
     // literal prefixes to stay honest keeps losing.
     //
     // FIRST HALF: the guard must REACH the decision at all.
-    let before = DENIAL_DECISIONS.with(std::cell::Cell::get);
-    test_intent_spec_reserved_token_obligation_is_scoped_to_verdict_surfaces();
-    let after = DENIAL_DECISIONS.with(std::cell::Cell::get);
-    assert!(
-        after > before,
-        "running `{SCOPED_OBLIGATION_GUARD}` decided denial not once, so the limit its \
-         prose declares is a limit of nothing: the guard no longer reaches the decision \
-         the paragraph describes"
-    );
+    //
+    // This half RUNS the other guard, and that guard reads the published
+    // specification -- which does not travel inside the `.crate`, where it
+    // therefore skips and reaches no decision. So this half is the one part
+    // of this test that the tarball cannot answer, and it says so with the
+    // same one skip line rather than going red on the auditor. Everything
+    // else here reads this file's OWN source and its own fixtures, which do
+    // travel, and stays unconditional.
+    if !spec_absent_because_packaged() {
+        let before = DENIAL_DECISIONS.with(std::cell::Cell::get);
+        test_intent_spec_reserved_token_obligation_is_scoped_to_verdict_surfaces();
+        let after = DENIAL_DECISIONS.with(std::cell::Cell::get);
+        assert!(
+            after > before,
+            "running `{SCOPED_OBLIGATION_GUARD}` decided denial not once, so the limit its \
+             prose declares is a limit of nothing: the guard no longer reaches the decision \
+             the paragraph describes"
+        );
+    }
 
     // SECOND HALF: and the rule it reaches is decided BY THAT LIST. Every
     // literal on it turns a fixture sentence into an unscoped denial; the

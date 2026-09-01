@@ -14,68 +14,15 @@ entry's release date is the date of its signed tag.
 
 ## [Unreleased]
 
+The two bullets below are kept here on purpose rather than moved into a
+release entry. The offline page is built by a release job from the vendor's
+tree, not from the crate, and no release — `0.3.6` or `0.3.7` — has carried
+one yet: no `.crate` of this crate contains an `.html`, and the GitHub release
+of `seetrex-verifier-v0.3.6` carries four assets, the two linux-musl
+executables and the `SHA256SUMS`/`SHA256SUMS.asc` pair. They move to the entry
+of the first release that does carry the page.
+
 ### Added
-- `package::PackageSource`, `package::PackageFiles` and
-  `package::verify_package_files`: package integrity verification can now be
-  driven from bytes already in memory, for a host that has no filesystem.
-  `verify_package(&Path, …)` keeps its signature and becomes a one-line wrapper
-  over the same seven steps, reading in the same order, with the same tokens
-  and the same exit codes.
-
-  Two separate things are measured, because a shipped binary has only ONE arm
-  and no run of it can compare two:
-  - **the binary did not move.** For the 83 corpus packages under
-    `tests/fixtures/corpus/*/pkg/`, the `verify-package` stdout, stderr and
-    exit code of the binary built from this tree are byte-identical to those
-    of the binary built from the commit before the seam. The `Dir` arm is the
-    only arm the CLI has, and it is unchanged.
-  - **the two arms answer alike.** An in-crate test loads each of those same
-    83 packages into a `PackageFiles` and compares `verify_package(dir)` with
-    `verify_package_files(&files)`: equal steps, warnings, recomputed verdict
-    hash and anchoring on success, the same error VARIANT on failure, and the
-    same exit class either way. A second test does the same for the package
-    shapes no corpus case has — a nested evidence tree, an EMPTY directory
-    under `evidence/`, an empty directory at the package root, a core file
-    absent, a manifest entry naming a directory, an oversized file no step
-    reads.
-
-  The two arms always agree on the error VARIANT and on the exit code. They do
-  not always agree on the WORDING, and the differences are declared:
-  - a file the steps read and cannot find is `Io` on both, but the `Dir` arm
-    quotes the operating system (`… (os error 2)`) where the in-memory arm
-    writes `no such file in the package`;
-  - an entry that names a DIRECTORY is unreadable on both, and the in-memory
-    arm says so in its own words (`is a directory, not a file in the package`)
-    because there is no operating system to quote;
-  - on Windows, the on-disk path an `Io`/`Malformed` message renders is now
-    spelled with the platform separator throughout (`…\pkg\evidence\x.json`);
-    steps 2 and 5 previously rendered the relative part verbatim
-    (`…\pkg\evidence/x.json`) while step 3 did not. POSIX is unaffected.
-
-  The in-memory arm cannot make step 1's symlink refusal: a host without a
-  filesystem cannot report a symlink. Only the 8192-file cardinality cap moves
-  to `PackageFiles::insert` (same value, same error value, an earlier point);
-  the 10 MiB per-file cap stays where the reads are, on BOTH arms, so a package
-  that merely LISTS an oversized file the seven steps never open is accepted by
-  both instead of being a pass on disk and a refusal in memory.
-
-  Two obligations fall on whatever BUILDS a `PackageFiles`, and neither can be
-  discharged inside this crate:
-  - **directories must be recorded**, `PackageFiles::insert_dir` for every one
-    walked, EMPTY ones included. A directory is not a key: a map built from
-    files alone can infer the directories that nest something, but not an
-    empty `evidence/empty_sub/`, which `read_dir` sees and which the `Dir` arm
-    refuses at step 3. A browser directory drop enumerates empty directories,
-    so a loader that ignores them turns a refusal into a pass. Keys themselves
-    are validated on the way in: `""`, `"evidence/"`, `"evidence//b.json"`,
-    a backslash, a `.` or `..` component, or a name given as both a file and a
-    directory are refused (`Shape`) rather than stored as something no
-    directory walk could ever emit.
-  - **total bytes must be bounded before the map is built.** Neither cap
-    bounds a package's total size — 8192 files of 10 MiB is 80 GiB on the
-    `Dir` arm too — and adding such a bound to the in-memory arm alone would
-    be a divergence, not a shared limit. By the time `insert` is called the
-    bytes are already allocated in the host's memory.
 - A signed release may now carry an OFFLINE BROWSER PAGE,
   `seetrex-verifier-offline.html`: one self-contained HTML file with a
   `wasm32-unknown-unknown` build of this same library embedded in it, opened
@@ -85,9 +32,9 @@ entry's release date is the date of its signed tag.
   no second vocabulary of its own. It makes no network request of any kind,
   which is checked as a property of the file's text; it cannot refuse a
   symlinked package member the way the executable does (the declared limit of
-  the in-memory arm above); and it is built from the vendor's tree rather than
-  from the signed tag, so what binds it to that tag is a version
-  correspondence, not byte identity. Route F of `docs/AUDITOR_KIT.md`, section
+  the in-memory arm recorded under `0.3.6` below); and it is built from the
+  vendor's tree rather than from the signed tag, so what binds it to that tag
+  is a version correspondence, not byte identity. Route F of `docs/AUDITOR_KIT.md`, section
   2.6, is the whole of it — how to obtain it, the two commands that check it,
   and where its limits are. A release may carry it or not.
 - The release job that builds it (`release-verifier-web`) builds the page
@@ -97,7 +44,73 @@ entry's release date is the date of its signed tag.
   release-signing key as the prebuilt executables. Publication is a separate,
   explicit act: the dispatch defaults to a dry run.
 
-## [seetrex-verifier 0.3.6] — 2026-08-30
+## [seetrex-verifier 0.3.7] — 2026-09-01
+
+The suite is green from every tree this channel publishes. `0.3.6` shipped it
+red and said so: a clone of the public repository failed
+`intent_blind_transcript`, and the unpacked `.crate` failed 28 tests across
+five targets — recorded in `docs/AUDITOR_KIT.md` section 2.2 as a defect of the
+packaging and a debt the producer owed. This release is that repair, and
+nothing else: every check that reads a document from outside the package, or
+resolves the transcript against git, now classifies the tree it runs in by
+positive evidence before demanding an input that tree cannot have, and a check
+that cannot run announces itself on one printed line instead of failing or
+being excused in silence. Existing commands, formats and exit codes are
+unchanged — measured, not assumed, and measurable by anyone: the executable's
+source (`src/bin/`) and its integration suite (`tests/bin_e2e.rs`), in the tree
+this release is cut from, are byte-identical to those of the published `0.3.6`
+`.crate` — measured before publication, with an empty `diff -r` against that
+unpacked tarball, so no subcommand, flag, output token or exit code moves.
+Once `0.3.7` is itself on crates.io the same comparison is owed between the two
+published artifacts: unpack both tarballs and `diff -r` those two paths at the
+tarball ROOT (inside a `.crate` there is no `crates/verifier/` prefix), the way
+appendix A of `docs/AUDITOR_KIT.md` compares them. An empty diff is what this
+entry predicts, and the recapture is what confirms it. What the two
+trees actually print is measured against the published channel after this
+release, not before, and `docs/AUDITOR_KIT.md` section 2.2 says which
+measurement it is showing.
+
+### Fixed
+- The test suite is now green from every tree the channel publishes, not only
+  from the producer's private repository. Measured at the `0.3.6` tag: a clone
+  of the public repository failed `intent_blind_transcript` (the transcript's
+  rows name commits of the private history, which the export does not carry),
+  and the unpacked `.crate` additionally failed every test that reads a
+  document under `../../docs/`, plus the guard that requires those paths to
+  resolve without reading them (`intent_public_crate_is_self_contained`) — 28
+  tests across five targets, fifteen of them unit tests of
+  `src/sbom/compare.rs`. Each check that reads a document from outside
+  the package, or resolves the transcript against git, now classifies the tree
+  it runs in by positive evidence before demanding an input that tree cannot
+  have: a packaged tree is proven by `Cargo.toml.orig` at the crate root, and
+  the git history by an anchor commit pinned in the test code — never by the
+  row being checked, so a forged transcript row stays a hard failure wherever
+  history exists. A check that cannot run skips out loud, on one printed line,
+  in the shape `skipped [<tree>]: <reason>`; nothing is excused silently, and
+  in the producer's tree not one of those lines is printed — every obligation
+  of this classification runs there (plus a new private guard that has no skip
+  branch at all). Two spellings of "skipped" therefore coexist in a run, and
+  the bracket is what tells them apart: the older `skipped: …` belongs to the
+  fifteen tests gated on the `SEETREX_PRIVATE_TREE` environment variable
+  (`src/sbom/private_tree.rs`), which predate this change, project lockfiles
+  no published tree carries, and print in all three trees with the variable
+  unset.
+- The `0.3.6` heading below dated that entry `2026-08-30`; its signed tag was
+  made `2026-08-31T10:45:28Z`, and this preamble says an entry's release date
+  is the date of its signed tag. Corrected here. The date on THIS entry's own
+  heading is the same kind of claim and is not yet measured: it is the UTC day
+  the `seetrex-verifier-v0.3.7` tag is cut, written before that tag exists. If
+  the tag is signed on another day, the heading is amended to the tagger's day
+  before the snapshot that carries it is pushed, so that no published copy of
+  this file dates an entry by anything but its signed tag.
+- The `0.3.6` entry below recorded the in-memory package seam under
+  `[Unreleased]`, although the `.crate` published as `0.3.6` already shipped
+  it, so the CHANGELOG published at that tag credited the release with less
+  than it published. The seam moves into that entry here, under a second
+  `### Added` heading dated with the day it was recorded, and is credited to
+  the release that shipped it rather than to this one.
+
+## [seetrex-verifier 0.3.6] — 2026-08-31
 
 RUST-BUG-02, and the second implementation that found it. The published `0.3.4`
 and `0.3.5` `.crate`s carry a `Cargo.lock` resolving `rust_decimal` 1.42.1
@@ -314,6 +327,77 @@ obliges a verifier to do.
   kit's Appendix A reports seven differing files there, the same five plus
   `Cargo.lock` and `Cargo.toml.orig`, and neither tarball carries this file at
   all.
+
+### Added (recorded 2026-09-01)
+
+This entry was cut on 2026-08-30, the day before the `0.3.6` tag was signed,
+but the `.crate` published as `0.3.6` was packaged from a later tree that
+already carried the seam below: the `src/package.rs` of the published `0.3.6`
+tarball is byte-identical to the one this tree publishes as `0.3.7`. That
+addition therefore shipped in `0.3.6`, not in `0.3.7`, and it is recorded here
+after the fact rather than credited to the later release.
+
+- `package::PackageSource`, `package::PackageFiles` and
+  `package::verify_package_files`: package integrity verification can now be
+  driven from bytes already in memory, for a host that has no filesystem.
+  `verify_package(&Path, …)` keeps its signature and becomes a one-line wrapper
+  over the same seven steps, reading in the same order, with the same tokens
+  and the same exit codes.
+
+  Two separate things are measured, because a shipped binary has only ONE arm
+  and no run of it can compare two:
+  - **the binary did not move.** For the 83 corpus packages under
+    `tests/fixtures/corpus/*/pkg/`, the `verify-package` stdout, stderr and
+    exit code of the binary built from this tree are byte-identical to those
+    of the binary built from the commit before the seam. The `Dir` arm is the
+    only arm the CLI has, and it is unchanged.
+  - **the two arms answer alike.** An in-crate test loads each of those same
+    83 packages into a `PackageFiles` and compares `verify_package(dir)` with
+    `verify_package_files(&files)`: equal steps, warnings, recomputed verdict
+    hash and anchoring on success, the same error VARIANT on failure, and the
+    same exit class either way. A second test does the same for the package
+    shapes no corpus case has — a nested evidence tree, an EMPTY directory
+    under `evidence/`, an empty directory at the package root, a core file
+    absent, a manifest entry naming a directory, an oversized file no step
+    reads.
+
+  The two arms always agree on the error VARIANT and on the exit code. They do
+  not always agree on the WORDING, and the differences are declared:
+  - a file the steps read and cannot find is `Io` on both, but the `Dir` arm
+    quotes the operating system (`… (os error 2)`) where the in-memory arm
+    writes `no such file in the package`;
+  - an entry that names a DIRECTORY is unreadable on both, and the in-memory
+    arm says so in its own words (`is a directory, not a file in the package`)
+    because there is no operating system to quote;
+  - on Windows, the on-disk path an `Io`/`Malformed` message renders is now
+    spelled with the platform separator throughout (`…\pkg\evidence\x.json`);
+    steps 2 and 5 previously rendered the relative part verbatim
+    (`…\pkg\evidence/x.json`) while step 3 did not. POSIX is unaffected.
+
+  The in-memory arm cannot make step 1's symlink refusal: a host without a
+  filesystem cannot report a symlink. Only the 8192-file cardinality cap moves
+  to `PackageFiles::insert` (same value, same error value, an earlier point);
+  the 10 MiB per-file cap stays where the reads are, on BOTH arms, so a package
+  that merely LISTS an oversized file the seven steps never open is accepted by
+  both instead of being a pass on disk and a refusal in memory.
+
+  Two obligations fall on whatever BUILDS a `PackageFiles`, and neither can be
+  discharged inside this crate:
+  - **directories must be recorded**, `PackageFiles::insert_dir` for every one
+    walked, EMPTY ones included. A directory is not a key: a map built from
+    files alone can infer the directories that nest something, but not an
+    empty `evidence/empty_sub/`, which `read_dir` sees and which the `Dir` arm
+    refuses at step 3. A browser directory drop enumerates empty directories,
+    so a loader that ignores them turns a refusal into a pass. Keys themselves
+    are validated on the way in: `""`, `"evidence/"`, `"evidence//b.json"`,
+    a backslash, a `.` or `..` component, or a name given as both a file and a
+    directory are refused (`Shape`) rather than stored as something no
+    directory walk could ever emit.
+  - **total bytes must be bounded before the map is built.** Neither cap
+    bounds a package's total size — 8192 files of 10 MiB is 80 GiB on the
+    `Dir` arm too — and adding such a bound to the in-memory arm alone would
+    be a divergence, not a shared limit. By the time `insert` is called the
+    bytes are already allocated in the host's memory.
 
 ## [seetrex-verifier 0.3.5] — 2026-08-28
 

@@ -39,7 +39,7 @@ Install the verifier first (see the repository README or
 [`docs/AUDITOR_KIT.md`](../../docs/AUDITOR_KIT.md)):
 
 ```
-$ cargo install seetrex-verifier --locked --version 0.3.5
+$ cargo install seetrex-verifier --locked --version 0.3.6
 ```
 
 **Without an external anchor** — internal consistency only:
@@ -49,15 +49,19 @@ $ seetrex-verifier verify-package examples/verdict-package/package
 ...
 STEP 7 external anchor SKIPPED — no --expected-verdict-hash supplied; the result is self-consistent only
 SELF-CONSISTENT (unanchored)
+This check re-computes hashes only. It does NOT re-execute the inference engine (that is `replay --full`), and it does NOT prove this verdict's position in the chain or its freshness (that is `verify-chain` against the published chain export with an externally obtained anchor). Package-internal consistency alone is never a trust root.
+HINT: pass --expected-verdict-hash <hex> (obtained from the published chain export or another external channel) to upgrade this to INTEGRITY-OK (weak) — the package can never be its own trust root.
 ```
 
 Exit code `4`. This is deliberately *not* a verification: a coherent forgery is
 self-consistent by construction. The package can never be its own trust root.
 
 **With the anchor taken from the chain export** — the way an auditor works.
-The transcript below was re-captured on 2026-08-29 with the `0.3.5`
+The transcript below was re-captured on 2026-08-31 with the `0.3.6`
 executable installed by the command above, run against the files in this
-directory; it is byte-identical to the `0.3.4` capture it replaces:
+directory. The `verify-chain` transcript is byte-identical to the `0.3.5`
+capture it replaces; the `verify-package` fences are not — they gained the
+trailing lines the binary really prints and the earlier capture had elided:
 
 ```
 $ seetrex-verifier verify-chain examples/verdict-package/example-audit-tenant-chain.json
@@ -74,6 +78,7 @@ $ seetrex-verifier verify-package examples/verdict-package/package \
 ...
 STEP 7 external anchor OK — the recomputed hash matches the externally supplied expected hash
 INTEGRITY-OK (weak)
+This check re-computes hashes only. It does NOT re-execute the inference engine (that is `replay --full`), and it does NOT prove this verdict's position in the chain or its freshness (that is `verify-chain` against the published chain export with an externally obtained anchor). Package-internal consistency alone is never a trust root.
 ```
 
 Exit code `0`. The anchor hash is read from the chain export — a file obtained

@@ -40,6 +40,8 @@
 //! as `SPEC-GAP-9.6-CLI`; it is absorbed here in one visible place rather than
 //! silently written out of the corpus.
 
+mod common;
+
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::process::{Command, Output};
@@ -302,20 +304,49 @@ fn run_case(case: &Case) -> (Vec<String>, Output) {
     (argv, out)
 }
 
-/// The headings of the specification, as the text after the leading `#`s.
-fn spec_headings() -> BTreeSet<String> {
+/// The headings of the specification, as the text after the leading `#`s —
+/// or `None` in an unpacked `.crate`, where the document does not travel.
+///
+/// `None` is returned ONLY on proof of packaging (`tests/common/mod.rs`).
+/// Everywhere else the missing document panics exactly as it always has: a
+/// source checkout without `docs/` is a broken tree, and a citation check
+/// that quietly measured nothing would certify the corpus against an empty
+/// set of headings.
+fn spec_headings() -> Option<BTreeSet<String>> {
     let spec = spec_path();
+    if !spec.is_file() {
+        let tree = common::classify();
+        assert_eq!(
+            tree,
+            common::Tree::Packaged,
+            "the specification under test is not at {} and this is not an \
+             unpacked `.crate` (`Cargo.toml.orig` is not beside the \
+             manifest). The corpus expectations are checked against ITS \
+             headings; with no document there is nothing to check.",
+            spec.display()
+        );
+        common::skip(
+            tree,
+            "corpus `# spec:` citations are not resolved against \
+             docs/SPEC_VERDICT_PACKAGE_V1.md: `cargo package` cannot carry a \
+             file from outside the package directory, so the document does \
+             not travel inside the .crate",
+        );
+        return None;
+    }
     let text = std::fs::read_to_string(&spec).unwrap_or_else(|e| {
         panic!(
             "the specification under test is not readable at {}: {e}",
             spec.display()
         )
     });
-    text.lines()
-        .filter_map(|l| l.strip_prefix('#'))
-        .map(|l| l.trim_start_matches('#').trim().to_string())
-        .filter(|l| !l.is_empty())
-        .collect()
+    Some(
+        text.lines()
+            .filter_map(|l| l.strip_prefix('#'))
+            .map(|l| l.trim_start_matches('#').trim().to_string())
+            .filter(|l| !l.is_empty())
+            .collect(),
+    )
 }
 
 // ─── T-T10-1: the corpus is the SPEC's answer, not an implementation's ───
@@ -335,7 +366,10 @@ fn spec_headings() -> BTreeSet<String> {
 ///     design and this guard is the wrong one.
 #[test]
 fn test_intent_corpus_expectations_are_spec_derived_not_generated() {
-    let headings = spec_headings();
+    // The skip line, if any, has already been printed on this test's behalf.
+    let Some(headings) = spec_headings() else {
+        return;
+    };
     assert!(
         headings.len() > 20,
         "only {} headings parsed out of the specification; the citation check \
