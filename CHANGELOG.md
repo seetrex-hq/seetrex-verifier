@@ -43,8 +43,10 @@ bullets move to the entry of the first release that does carry the page.
 - The release job that builds it (`release-verifier-web`) builds the page
   TWICE and compares the bytes, answers it against the 92-case conformance
   corpus through the very payload the shipped file carries, and only then
-  hashes it into a `SHA256SUMS` GPG-signed as `SHA256SUMS.asc` under the same
-  release-signing key as the prebuilt executables. Publication is a separate,
+  hashes it into a `seetrex-verifier-offline.SHA256SUMS` — a hash list of its
+  own name, so it can never collide with the binaries' bare `SHA256SUMS` on
+  the same release — GPG-signed as `seetrex-verifier-offline.SHA256SUMS.asc`
+  under the same release-signing key as the prebuilt executables. Publication is a separate,
   explicit act: the dispatch defaults to a dry run.
 
 ### Fixed

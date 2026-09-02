@@ -17,13 +17,13 @@ license = "Apache-2.0"
 description = "Pure offline verification core for Seetrex Compliance verdict packages (hash integrity, chain, ruleset anchor)"
 repository = "https://github.com/seetrex-hq/seetrex-verifier"
 # The Python reference of route E is COMPILED by the interpreter the moment a
-# test runs it, and the staging tree of `scripts/export_public.sh` runs it in
-# phase 4 -- after the phase 3 marker scan. Without this, `cargo package` from
-# that staging tree packs `reference/__pycache__/*.pyc`: a machine-specific
-# build artifact, inside an immutable release. Measured on the 0.3.6 export
-# (622 entries, one of them the `.pyc`). The public REPOSITORY push has the
-# same exposure and this key does not govern it -- the release checklist
-# deletes the directory before the overlay.
+# test runs it, and the release export runs the test suite inside the tree it
+# is about to package. Without this, `cargo package` from that tree packs
+# `reference/__pycache__/*.pyc`: a machine-specific build artifact, inside an
+# immutable release. Measured on the 0.3.6 export (622 entries, one of them
+# the `.pyc`). The public REPOSITORY push has the same exposure and this key
+# does not govern it -- the export deletes the directory in the same step that
+# creates it, and aborts if one survives.
 exclude = ["**/__pycache__"]
 
 # The auditor-facing CLI. Declared EXPLICITLY (not left to src/bin
@@ -66,7 +66,7 @@ thiserror = { workspace = true }
 # an offline page that cannot start. This crate never calls `Utc::now()` (only
 # a doc comment mentions it, `src/canonical.rs:99`); it parses and formats
 # timestamps, which is `std` + `serde` only. The `=` pin is kept VERBATIM so
-# the kit's "Build toolchain" row and `scripts/export_public.sh`'s verbatim
+# the kit's "Build toolchain" row and the release export's verbatim
 # workspace-line check stay true.
 #
 # Measured (T-T11-1), and load-bearing for whoever reads this next: this line

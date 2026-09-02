@@ -1,1 +1,7 @@
+# Ignore policy for this repository.
+#
+# Two rules, written by the release export: the build directory, and the
+# bytecode cache the Python reference of the verifier leaves behind whenever
+# its tests run it.
 /target
+__pycache__/
