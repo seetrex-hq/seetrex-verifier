@@ -18,12 +18,21 @@ The two bullets under `### Added` below are kept here on purpose rather than
 moved into a release entry, and that applies to them alone: the `### Fixed`
 bullets beside them record work done on this document after `0.3.7` was
 published and belong to no later release. The offline page is built by a
-release job from the vendor's tree, not from the crate, and no release —
-`0.3.6` or `0.3.7` — has carried one yet: no `.crate` of this crate contains
-an `.html`, and the GitHub releases of `seetrex-verifier-v0.3.6` and
-`seetrex-verifier-v0.3.7` carry four assets each, the two linux-musl
-executables and the `SHA256SUMS`/`SHA256SUMS.asc` pair. The two `### Added`
-bullets move to the entry of the first release that does carry the page.
+release job from the vendor's tree, not from the crate, and no `.crate` of
+this crate contains an `.html` — that has not changed, and it is why these
+bullets are not a crate changelog entry. What HAS changed is the release
+they hang from: measured 2026-09-03, the GitHub release of
+`seetrex-verifier-v0.3.7` carries seven assets — the two linux-musl
+executables with their `SHA256SUMS`/`SHA256SUMS.asc` pair, and
+`seetrex-verifier-offline.html` with a
+`seetrex-verifier-offline.SHA256SUMS`/`.asc` pair of its own — while the
+release of `seetrex-verifier-v0.3.6` still carries four and no page. The rule
+these bullets used to state is NARROWED rather than dropped: they move to the
+entry of the first release CUT with the page, and `0.3.7` is not that release.
+Its entry below says this release is a repair «and nothing else», which is
+true of the crate it published on 2026-09-01; the page was attached to that
+same release two days later, by a separate job, out of a tree the crate does
+not contain.
 
 ### Added
 - A signed release may now carry an OFFLINE BROWSER PAGE,
@@ -69,6 +78,18 @@ bullets move to the entry of the first release that does carry the page.
   a prediction about it. The tarball pair, its file counts and the one shared
   path under `src/` that differs are pinned in the auditor kit, appendix A,
   which records that diff in full; this file names none of those figures.
+- 2026-09-03: the offline page is PUBLISHED. The release job ran against
+  `seetrex-verifier-v0.3.7` and attached the three assets the bullets above
+  describe. Route F of `docs/AUDITOR_KIT.md`, section 2.6, was then walked
+  against the channel rather than stated as a rule: the three files were
+  downloaded from that release with the section's own commands, `gpg --verify`
+  answered `Good signature` under the release-signing fingerprint, and
+  `sha256sum --ignore-missing -c` answered `OK`. That capture is recorded in
+  section 2.6 of the kit, under a document revision of its own, and the
+  sentence above that said no release carried a page yet now names the one
+  that does and what it holds. Neither that section nor this file names a
+  digest of any release asset: what anchors the bytes is the key that signs
+  the list.
 
 ## [seetrex-verifier 0.3.7] — 2026-09-01
 
