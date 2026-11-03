@@ -90,6 +90,16 @@ not contain.
   that does and what it holds. Neither that section nor this file names a
   digest of any release asset: what anchors the bytes is the key that signs
   the list.
+- 2026-11-03: the re-observation the `0.3.8` entry below called owed has been
+  made against the published channel. After the crate reached crates.io and
+  its signed tag `seetrex-verifier-v0.3.8` reached the public repository, the
+  install capture, the subcommand help codes, the `git tag -v` walkthrough, the
+  suite run in the two published trees, the tag list, the registry read-back,
+  the line endings and appendix A of `docs/AUDITOR_KIT.md` were measured again
+  against the channel, and its section 7.1 walkthrough was captured again with
+  the installed `0.3.8`. That revision of the kit,
+  `2026-11-03-recapture-0-3-8`, is the record; this file restates none of its
+  figures.
 
 ## [seetrex-verifier 0.3.8] — 2026-11-03
 
@@ -99,8 +109,9 @@ the submitter signature of the log's leaves. Under a `seetrex/anchor-kit/v1`
 kit, `verify-anchor` keeps its verdict and its exit code on every input and
 prints one line more, a second with `--monitor` when the COMPLETITUD rules ran,
 and a longer footer. The binaries `0.3.3` to `0.3.7` refuse a v2 kit, exit 2.
-This entry was written from the tree the release is cut from: re-observation
-against the published `0.3.8` is owed (release runbook, section 7).
+This entry was written from the tree the release is cut from: the
+re-observation against the published `0.3.8` that it owed (release runbook,
+section 7) was made on 2026-11-03, recorded under `[Unreleased]` above.
 
 ### Changed
 - Breaking at the source level for a caller of the library, under the semver convention Cargo resolves a `0.3.x` by, and recorded here as such: `AuditorKit` gains the public field `identity_pubkeys`, so a struct literal of it stops compiling; `KitError` gains `IdentityPubkeysInV1Kit`, `IdentityPubkeysRequired`, `DuplicateIdentityPubkey`, `InvalidIdentityPubkey` and `GenesisKeyNotInKit`, so an exhaustive `match` on it stops compiling. `RecordError` is new with the `record` module of this same release, so `KitLacksIdentityKeys` and `KitMissingIdentityKey` break nobody against `0.3.7`; like `KitError` it is not `#[non_exhaustive]`, so any variant added after this release will. No published signature changes, and `verify_anchored_package` and `verify_anchored_package_with_chain` keep their behaviour: the signatures live in the new `verify_anchored_package_with_kit`.
