@@ -27,24 +27,24 @@
 //! - [`hash`] — `sha256_hex`, the raw-bytes → lowercase-hex SHA-256
 //!   primitive shared by package verification and the CLI replay path.
 //! - [`merkle`] — RFC 6962 inclusion-proof verification (`verify_inclusion`),
-//!   the pure offline half of the anchor `CONSISTENCIA` inclusion check
-//!   (offline half); the cosigned-checkpoint half that authenticates the
-//!   root lives in `checkpoint`.
+//!   the offline half of the anchor `CONSISTENCIA` inclusion check; the
+//!   cosigned-checkpoint half that authenticates the root is `checkpoint`.
 //! - [`anchor`] — the external-anchor `seetrex/anchor/v1` preimage
 //!   convention and the two-verdict `CONSISTENCIA`/`COMPLETITUD` core.
 //! - [`anchor_package`] — the `anchor.json` transport (serde) and the
 //!   package-level orchestration `verify_anchored_package`:
 //!   the rotate-inclusion gate (rotate inclusion → identity) wired with
-//!   per-leaf inclusion and the package JOIN; witness policy and pinned
-//!   genesis are
-//!   auditor-kit inputs, never carried in the untrusted package.
+//!   per-leaf inclusion and the package JOIN; witness policy and pinned genesis
+//!   are auditor-kit inputs, never carried in the untrusted package.
 //! - [`package`] — `verify_package`: offline package-integrity
 //!   verification — the logic the `verify-package` CLI subcommand is a
 //!   thin shell over.
-//! - [`scope`] — the auditor-facing scope statements (`SCOPE_NOT_COVERED`,
-//!   `SCOPE_LINK_CLAIM`) shared verbatim by the public verifier binary and the
+//! - [`record`] — `verify_record`: from the head of a record to a log leaf.
+//! - [`scope`] — the auditor-facing scope statements: `SCOPE_NOT_COVERED` and
+//!   `SCOPE_LINK_CLAIM`, shared verbatim by the public verifier binary and the
 //!   `compliance-cli`, so the two surfaces cannot disagree about what the
-//!   OFFLINE chain check covers.
+//!   OFFLINE chain check covers; and `SCOPE_ANCHOR` and `SCOPE_RECORD`, which
+//!   only `verify-anchor` and `verify-record` of the public binary print.
 //! - [`sbom`] — the canonical SBOM projection: a lockfile is projected
 //!   into a CycloneDX document with no clock and no random identifier,
 //!   serialized through the same JCS primitive as the verdict hash, so
@@ -73,6 +73,7 @@ pub mod evidence;
 pub mod hash;
 pub mod merkle;
 pub mod package;
+pub mod record;
 pub mod rulesets;
 pub mod sbom;
 pub mod scope;

@@ -684,33 +684,83 @@ fn ingest_normaliser_source() -> Option<String> {
     }))
 }
 
+/// The anchor the whitelist is read by: an ACTUAL call, not the quotation of
+/// one. The key literal is NOT part of it -- `rustfmt` wraps a long call
+/// right after the `(`, and an anchor that demanded the quote immediately
+/// there would stop seeing the key it wraps.
+const INSERT_ANCHOR: &str = "canonical.insert(";
+
+/// One source line with its trailing `//` comment removed, tracking string
+/// literals so a `//` inside one is not mistaken for a comment. A line that
+/// IS a comment (`//`, `///`, `//!`) collapses to the empty string.
+///
+/// Block comments and raw strings are deliberately not modelled: the ingest
+/// normaliser carries neither (`/*` and `r#"` are absent from it), and a
+/// scanner that pretended to handle them would be untested prose.
+fn code_before_comment(line: &str) -> &str {
+    let bytes = line.as_bytes();
+    let mut in_string = false;
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\\' if in_string => index += 1,
+            b'"' => in_string = !in_string,
+            b'/' if !in_string && bytes.get(index + 1) == Some(&b'/') => return &line[..index],
+            _ => {}
+        }
+        index += 1;
+    }
+    line
+}
+
 /// The BOM-level keys the ingest normaliser writes into its canonical form,
 /// read TEXTUALLY from its source.
+///
+/// The keys come from CODE only. Comments are stripped before the scan, so
+/// prose that quotes an insert call -- a MUTANTE note, a doc example -- can
+/// never put a key into the whitelist; and the anchor [`INSERT_ANCHOR`] stops
+/// at the `(`, skipping any run of whitespace (NEWLINES INCLUDED) before the
+/// key literal, so a call `rustfmt` wrapped can never take one out. An insert
+/// whose key is not a string literal is a FAILURE, not a silent omission: it
+/// cannot be read textually, and a guard that reads nothing certifies nothing.
 ///
 /// `metadata` is reported as `metadata.component`, which is what the
 /// normaliser actually keeps under it and what the specification names.
 fn ingest_whitelist(source: &str) -> BTreeSet<String> {
-    let marker = "canonical.insert(\"";
+    let code = source
+        .lines()
+        .map(code_before_comment)
+        .collect::<Vec<&str>>()
+        .join("\n");
+
     let mut keys = BTreeSet::new();
-    let mut rest = source;
-    while let Some(at) = rest.find(marker) {
-        let after = &rest[at + marker.len()..];
-        let end = after
+    let mut rest = code.as_str();
+    while let Some(at) = rest.find(INSERT_ANCHOR) {
+        let after = rest[at + INSERT_ANCHOR.len()..].trim_start();
+        let literal = after.strip_prefix('"').unwrap_or_else(|| {
+            panic!(
+                "`{INSERT_ANCHOR}` is followed by `{}`, not by a string-literal key. A \
+                 computed key cannot be read textually, and a guard that reads nothing \
+                 certifies nothing.",
+                after.chars().take(40).collect::<String>()
+            )
+        });
+        let end = literal
             .find('"')
-            .unwrap_or_else(|| panic!("unterminated key literal after `{marker}`"));
-        let key = &after[..end];
+            .unwrap_or_else(|| panic!("unterminated key literal after `{INSERT_ANCHOR}`"));
+        let key = &literal[..end];
         keys.insert(if key == "metadata" {
             "metadata.component".to_string()
         } else {
             key.to_string()
         });
-        rest = &after[end..];
+        rest = &literal[end..];
     }
     assert!(
         keys.contains("bomFormat") && keys.contains("components"),
         "the ingest whitelist was read as {keys:?}, which does not look like the \
-         normaliser's canonical map. The extraction anchor `{marker}` has moved, and a \
-         guard that reads nothing certifies nothing."
+         normaliser's canonical map. The extraction anchor `{INSERT_ANCHOR}` has moved, and \
+         a guard that reads nothing certifies nothing."
     );
     keys
 }
@@ -721,21 +771,107 @@ fn unwrapped(text: &str) -> String {
     text.split_whitespace().collect::<Vec<&str>>().join(" ")
 }
 
+/// INTENT: the ingest whitelist is read from the normaliser's CODE. A comment
+///   that QUOTES an insert call must not add a key, and a call `rustfmt`
+///   wrapped after its `(` must not lose one: the section-5.4 guard is worth
+///   its assertion only if the set it compares is the set of calls the
+///   normaliser really makes.
+/// CONTEXT: the anchor used to be `canonical.insert("`, with the quote glued
+///   to the paren. The fifth insertion of the real normaliser
+///   (`top_level_dependencies`) wraps the line right after that `(`, so the
+///   anchor never matched it -- the key reached the guard only through a
+///   MUTANTE doc-comment in the same file, and deleting that comment would
+///   have dropped a key from the guard's view with nothing going red.
+/// EXPIRES IF: `ingest_whitelist` stops reading the normaliser textually --
+///   e.g. its canonical map becomes introspectable from this crate -- or the
+///   normaliser starts carrying block comments or raw strings, which
+///   [`code_before_comment`] deliberately does not model.
+/// MUTANT: put the key literal back into [`INSERT_ANCHOR`] -> the wrapped call
+///   below loses `top_level_dependencies`; drop the comment stripping of
+///   [`ingest_whitelist`] -> the quoted calls below add `phantom_*` keys, and
+///   the real file's whitelist stops surviving the removal of its prose.
+#[test]
+fn test_intent_ingest_whitelist_reads_calls_not_comments() {
+    // A comment that quotes a call, a call with a trailing comment that
+    // quotes another, and a call wrapped right after its `(`.
+    const FIXTURE: &str = r#"
+    // canonical.insert("phantom_from_a_line_comment".to_string(), json!(null));
+    /// MUTANTE: delete the `canonical.insert("phantom_from_a_doc_comment", …)` line.
+    canonical.insert("bomFormat".to_string(), json!("CycloneDX"));
+    canonical.insert("metadata".to_string(), json!({ "component": subject }));
+    canonical.insert("components".to_string(), components); // canonical.insert("phantom_trailing", x)
+    canonical.insert(
+        "top_level_dependencies".to_string(),
+        Value::Array(ids.into_iter().map(Value::String).collect()),
+    );
+"#;
+    let expected: BTreeSet<String> = [
+        "bomFormat",
+        "components",
+        "metadata.component",
+        "top_level_dependencies",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect();
+    assert_eq!(
+        ingest_whitelist(FIXTURE),
+        expected,
+        "the whitelist extractor read the fixture wrong: a wrapped call must yield its \
+         key and a quoted one must yield nothing at all."
+    );
+
+    let Some(source) = ingest_normaliser_source() else {
+        return;
+    };
+    // The same file with every comment LINE gone: the normaliser's MUTANTE
+    // note quotes an insert of `top_level_dependencies`, so a whitelist that
+    // changes here is a whitelist that was reading prose.
+    let without_comments = source
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("//"))
+        .collect::<Vec<&str>>()
+        .join("\n");
+    let from_code = ingest_whitelist(&without_comments);
+    assert!(
+        from_code.contains("top_level_dependencies"),
+        "the ingest normaliser's fifth insertion is not read from its code: the whitelist \
+         of the comment-free source is {from_code:?}. The key wraps the line right after \
+         `{INSERT_ANCHOR}`, and an anchor that misses it certifies the document against a \
+         set the code does not write."
+    );
+    assert_eq!(
+        ingest_whitelist(&source),
+        from_code,
+        "a key of the ingest whitelist comes from PROSE: the full source and the \
+         comment-free source disagree, so deleting a comment would silently move the set \
+         the section-5.4 guard compares."
+    );
+}
+
 /// INTENT: section 5.4 item 1 does not claim that the top-level set SURVIVES
 ///   this product's normalisation while `dependencies` is absent from the
-///   ingest whitelist, and the four keys it names ARE that whitelist. The
-///   sentence is the only place a reader learns what the emitted
-///   `dependencies` array is worth inside the evidence chain, and it claimed
-///   survival that does not happen.
+///   ingest whitelist, and the keys it names -- however many the code writes
+///   -- ARE that whitelist. The sentence is the only place a reader learns
+///   what the emitted `dependencies` array is worth inside the evidence
+///   chain, and it claimed survival that does not happen.
 /// CONTEXT: the normaliser (`crates/compliance/src/connectors/cyclonedx/mod.rs`)
-///   builds a four-key canonical map and drops `dependencies`; widening it is a
-///   pinned-ruleset change with its own gate. When that lands, this guard flips:
-///   the survival claim becomes the required wording and the "today" sentence
-///   the forbidden one.
+///   builds its canonical map with `canonical.insert` calls and drops
+///   `dependencies`; widening it is a pinned-ruleset change with its own gate.
+///   When that lands, this guard flips: the survival claim becomes the
+///   required wording and the "today" sentence the forbidden one. The count is
+///   never written here: it is whatever [`ingest_whitelist`] reads from the
+///   anchor [`INSERT_ANCHOR`] -- the call up to its `(`, with the key literal
+///   allowed to sit after any whitespace or line break, and with comments
+///   stripped so a note QUOTING a call cannot stand in for the call itself.
 /// EXPIRES IF: the canonical SBOM stops being ingested into the chain at all,
 ///   or the normaliser's canonical map stops being built by `canonical.insert`.
 /// MUTANT: restore "precisely so that it survives normalisation" to 5.4(1);
 ///   add `dependencies` to the normaliser's map without touching the document.
+///   The converse mutant belongs to
+///   `test_intent_ingest_whitelist_reads_calls_not_comments`: deleting the
+///   normaliser's MUTANTE note (prose that quotes an insert call) must NOT
+///   move a key out of this whitelist.
 #[test]
 fn test_intent_spec_ingest_whitelist_matches_5_4() {
     let Some(source) = ingest_normaliser_source() else {

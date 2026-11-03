@@ -58,14 +58,16 @@ use crate::anchor::{
     PreimageError, RotationRecord, Verdict,
 };
 use crate::anchor_completitud::{
-    verify_completitud_reported, MonitorEnumeration, SlugObservation, TruncationReference,
+    verify_completitud_under_keys, CompletitudRun, MonitorEnumeration, SlugObservation,
+    TruncationReference,
 };
 use crate::chain_export::PublicChainRow;
 use crate::checkpoint::{
+    check_submitter_signatures, is_usable_pubkey, key_hash, key_missing_from_kit,
     verify_anchored_inclusion, verify_checkpoint, verify_rotate_inclusion, AnchoredLeaf,
-    Checkpoint, Cosignature, WitnessPolicy,
+    Checkpoint, Cosignature, SignatureFailure, WitnessPolicy,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 // ---- wire schema (`seetrex/anchor/v1`) — DTOs with hex strings -------------
 
@@ -83,7 +85,7 @@ struct CosignatureDto {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct CheckpointDto {
+pub(crate) struct CheckpointDto {
     size: u64,
     root: String,
     log_signature: String,
@@ -93,7 +95,7 @@ struct CheckpointDto {
 /// Lane DTO — the closed carrier set, tagged by `kind`.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase", deny_unknown_fields)]
-enum LaneDto {
+pub(crate) enum LaneDto {
     Head {
         slug: String,
         ordinal: u64,
@@ -117,7 +119,7 @@ enum LaneDto {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct AnchoredLeafDto {
+pub(crate) struct AnchoredLeafDto {
     lane: LaneDto,
     submitter_signature: String,
     submitter_key_hash: String,
@@ -167,7 +169,7 @@ pub enum AnchorJsonError {
 /// Decode a lowercase-hex string of exactly `N` bytes (`2*N` chars). Uppercase
 /// or wrong length ⇒ error (a package we would emit is canonical lowercase; a
 /// non-canonical encoding is not ours — fail closed).
-fn hex_fixed<const N: usize>(field: &'static str, s: &str) -> Result<[u8; N], AnchorJsonError> {
+pub(crate) fn hex_fixed<const N: usize>(field: &'static str, s: &str) -> Result<[u8; N], AnchorJsonError> {
     let is_lower_hex = s.len() == 2 * N
         && s.bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
@@ -233,7 +235,7 @@ impl LaneDto {
 }
 
 impl AnchoredLeafDto {
-    fn into_leaf(self) -> Result<AnchoredLeaf, AnchorJsonError> {
+    pub(crate) fn into_leaf(self) -> Result<AnchoredLeaf, AnchorJsonError> {
         let proof = self
             .inclusion_proof
             .iter()
@@ -250,7 +252,7 @@ impl AnchoredLeafDto {
 }
 
 impl CheckpointDto {
-    fn into_checkpoint(self) -> Result<Checkpoint, AnchorJsonError> {
+    pub(crate) fn into_checkpoint(self) -> Result<Checkpoint, AnchorJsonError> {
         let cosignatures = self
             .cosignatures
             .into_iter()
@@ -442,6 +444,13 @@ pub fn emit_anchor_package(pkg: &AnchorPackage) -> Result<String, EmitError> {
 /// The only accepted auditor-kit version.
 pub const ANCHOR_KIT_VERSION: &str = "seetrex/anchor-kit/v1";
 
+/// The kit that pins the public keys of the producer identity, and with them the
+/// submitter signatures: [`ANCHOR_KIT_VERSION`] plus `identity_pubkeys`. A new
+/// version and not an optional field, because `deny_unknown_fields` makes every
+/// binary before 0.3.8 refuse the field either way, and a same-named version would
+/// mean two things.
+pub const ANCHOR_KIT_V2_VERSION: &str = "seetrex/anchor-kit/v2";
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WitnessPolicyDto {
@@ -456,7 +465,22 @@ struct AuditorKitDto {
     version: String,
     tenant_slug: String,
     genesis_key_hash: String,
+    /// Required by v2, refused by v1: whether the key is there is checked against
+    /// the version, not by serde, so that each case has its own error. The outer
+    /// `Option` is the key, the inner one its value: `null` is a key that is there.
+    #[serde(default, deserialize_with = "key_is_present")]
+    identity_pubkeys: Option<Option<Vec<String>>>,
     policy: WitnessPolicyDto,
+}
+
+/// `Some` for any value of the key, `null` included, which plain `Option` would read
+/// as the key being absent. Reached only when the key is there; `default` covers the
+/// other case.
+fn key_is_present<'de, D>(deserializer: D) -> Result<Option<Option<Vec<String>>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<Vec<String>>::deserialize(deserializer).map(Some)
 }
 
 /// The PINNED auditor-kit inputs to [`verify_anchored_package`]: the audited
@@ -471,6 +495,10 @@ pub struct AuditorKit {
     pub tenant_slug: String,
     pub genesis_key_hash: [u8; 32],
     pub policy: WitnessPolicy,
+    /// The raw public keys of the producer identity, the only source of them: the
+    /// package and the log carry their hashes. Empty for a v1 kit, which checks no
+    /// submitter signature. A v2 kit has at least the key of the genesis.
+    pub identity_pubkeys: Vec<[u8; 32]>,
 }
 
 /// Why an auditor kit could not be parsed into a structurally-valid
@@ -494,6 +522,18 @@ pub enum KitError {
     /// channel: a mis-provisioned witness set is exactly the auditor foot-gun the
     /// exit-2 kit channel exists to isolate.
     QuorumExceedsWitnesses { quorum_k: usize, witnesses: usize },
+    /// A v1 kit carries `identity_pubkeys`: its version says it pins no key.
+    IdentityPubkeysInV1Kit,
+    /// A v2 kit has no `identity_pubkeys`, or an empty list.
+    IdentityPubkeysRequired,
+    /// The same key twice in `identity_pubkeys`.
+    DuplicateIdentityPubkey { value: String },
+    /// An entry of `identity_pubkeys` is not an Ed25519 point that can verify a
+    /// signature: not a point, or a point of small order.
+    InvalidIdentityPubkey { value: String },
+    /// No entry of `identity_pubkeys` hashes to `genesis_key_hash`: the kit pins
+    /// keys of some identity other than the one it follows.
+    GenesisKeyNotInKit,
 }
 
 /// Map an `InvalidHex` from the shared [`hex_fixed`] into the kit's own error
@@ -504,6 +544,42 @@ fn kit_hex(e: AnchorJsonError) -> KitError {
         AnchorJsonError::InvalidHex { field, value } => KitError::InvalidHex { field, value },
         other => KitError::Json(format!("unexpected hex-decode error: {other:?}")),
     }
+}
+
+/// The `identity_pubkeys` of a kit of `version`, whose presence the version decides.
+/// In a v2 kit: not empty, each entry able to verify a signature, none repeated, and
+/// one of them the key `genesis_key_hash` names, so that a wrong kit is refused
+/// when it is read and not reported as a verdict about the vendor.
+fn parse_identity_pubkeys(
+    version: &str,
+    listed: Option<Option<Vec<String>>>,
+    genesis_key_hash: &[u8; 32],
+) -> Result<Vec<[u8; 32]>, KitError> {
+    if version == ANCHOR_KIT_VERSION {
+        return match listed {
+            None => Ok(Vec::new()),
+            Some(_) => Err(KitError::IdentityPubkeysInV1Kit),
+        };
+    }
+    let listed = listed
+        .flatten()
+        .filter(|keys| !keys.is_empty())
+        .ok_or(KitError::IdentityPubkeysRequired)?;
+    let mut keys: Vec<[u8; 32]> = Vec::with_capacity(listed.len());
+    for text in listed {
+        let key = hex_fixed::<32>("identity_pubkeys", &text).map_err(kit_hex)?;
+        if !is_usable_pubkey(&key) {
+            return Err(KitError::InvalidIdentityPubkey { value: text });
+        }
+        if keys.contains(&key) {
+            return Err(KitError::DuplicateIdentityPubkey { value: text });
+        }
+        keys.push(key);
+    }
+    if !keys.iter().any(|key| key_hash(key) == *genesis_key_hash) {
+        return Err(KitError::GenesisKeyNotInKit);
+    }
+    Ok(keys)
 }
 
 /// Parse an auditor-kit document into a structurally-valid [`AuditorKit`].
@@ -518,7 +594,7 @@ fn kit_hex(e: AnchorJsonError) -> KitError {
 pub fn parse_auditor_kit(json: &str) -> Result<AuditorKit, KitError> {
     let dto: AuditorKitDto =
         serde_json::from_str(json).map_err(|e| KitError::Json(e.to_string()))?;
-    if dto.version != ANCHOR_KIT_VERSION {
+    if dto.version != ANCHOR_KIT_VERSION && dto.version != ANCHOR_KIT_V2_VERSION {
         return Err(KitError::UnsupportedVersion { got: dto.version });
     }
     if dto.policy.quorum_k == 0 {
@@ -540,6 +616,8 @@ pub fn parse_auditor_kit(json: &str) -> Result<AuditorKit, KitError> {
             witnesses: witnesses.len(),
         });
     }
+    let identity_pubkeys =
+        parse_identity_pubkeys(&dto.version, dto.identity_pubkeys, &genesis_key_hash)?;
     Ok(AuditorKit {
         tenant_slug: dto.tenant_slug,
         genesis_key_hash,
@@ -548,6 +626,7 @@ pub fn parse_auditor_kit(json: &str) -> Result<AuditorKit, KitError> {
             witnesses,
             quorum_k: dto.policy.quorum_k,
         },
+        identity_pubkeys,
     })
 }
 
@@ -703,8 +782,10 @@ pub struct MonitorAudit<'a> {
 /// with `None` the two verdicts never collapse; with `Some` this
 /// authenticates the package checkpoint and runs [`verify_completitud`], returning
 /// its real verdict (or `INCONCLUSO` if that checkpoint does not authenticate).
-/// It is evaluated only on the offline success path — a package already
-/// contradicted by CONSISTENCIA keeps the INCONCLUSO default (fail-fast). A
+/// A package refused by the tenant guard, a `rotate` leaf, the identity derivation
+/// or a per-tenant leaf keeps the INCONCLUSO default (fail-fast). The JOIN of step 3
+/// does not stop it: the two axes are independent, so a `Failed` CONSISTENCIA can
+/// sit beside a real COMPLETITUD, a `Verified` one included. A
 /// supplied monitor's `Verified` is CONDITIONAL on the enumeration being COMPLETE
 /// and RECENT (both
 /// TRUSTED inputs deferred to the live monitor), not an unconditional
@@ -729,7 +810,10 @@ pub fn verify_anchored_package(
 /// [`verify_anchored_package`] plus `published_chain`: the producer's CURRENT
 /// published chain export, when the auditor has one.
 ///
-/// CONSISTENCIA is UNAFFECTED - it never reads the export. The export decides ONE
+/// CONSISTENCIA is UNAFFECTED - it never reads the export, and when it fails it fails
+/// as in [`verify_anchored_package`]: at the JOIN, COMPLETITUD still runs, so a
+/// `Failed` CONSISTENCIA can come with a `Verified` COMPLETITUD, and only the earlier
+/// refusals keep the `INCONCLUSO` default. The export decides ONE
 /// question, in COMPLETITUD's truncation rule (G-v6-2): an enumerated `HEAD@k` that
 /// the package's own rows do not reach. `pkg.rows` is a SNAPSHOT of the chain taken
 /// when the package was emitted, and a producer that submits heads to the log more
@@ -752,6 +836,40 @@ pub fn verify_anchored_package_with_chain(
     pkg: &AnchorPackage,
     monitor: Option<&MonitorAudit>,
     published_chain: Option<&[PublicChainRow]>,
+) -> AnchoredPackageReport {
+    let mut bundle = BundleFindings::default();
+    package_report(
+        tenant_slug,
+        genesis_key_hash,
+        policy,
+        pkg,
+        monitor,
+        published_chain,
+        &[],
+        &mut bundle,
+    )
+}
+
+/// What COMPLETITUD found in a bundle that [`AnchoredPackageReport`] does not carry.
+#[derive(Default)]
+struct BundleFindings {
+    /// `None`: the rules did not run.
+    leaves_discarded: Option<usize>,
+    reached_keys: Vec<[u8; 32]>,
+}
+
+/// The body of [`verify_anchored_package_with_chain`]. `identity_pubkeys` goes to the
+/// rules: with none, as there, no leaf of the bundle is read.
+#[allow(clippy::too_many_arguments)]
+fn package_report(
+    tenant_slug: &str,
+    genesis_key_hash: [u8; 32],
+    policy: &WitnessPolicy,
+    pkg: &AnchorPackage,
+    monitor: Option<&MonitorAudit>,
+    published_chain: Option<&[PublicChainRow]>,
+    identity_pubkeys: &[[u8; 32]],
+    bundle: &mut BundleFindings,
 ) -> AnchoredPackageReport {
     let completitud = Verdict::Inconclusive {
         reason: "COMPLETITUD not evaluated — enumeration-dependent; either no \
@@ -867,18 +985,31 @@ pub fn verify_anchored_package_with_chain(
                 },
                 None,
             ),
-            Ok(root) => verify_completitud_reported(
-                tenant_slug,
-                &pkg.rows,
-                published_chain,
-                &lanes,
-                pkg.checkpoint.size,
-                root,
-                genesis_key_hash,
-                m.enumeration,
-                policy,
-                m.observations,
-            ),
+            Ok(root) => {
+                let CompletitudRun {
+                    verdict,
+                    reference,
+                    leaves_discarded,
+                    reached_keys,
+                } = verify_completitud_under_keys(
+                    tenant_slug,
+                    &pkg.rows,
+                    published_chain,
+                    &lanes,
+                    pkg.checkpoint.size,
+                    root,
+                    genesis_key_hash,
+                    m.enumeration,
+                    policy,
+                    m.observations,
+                    identity_pubkeys,
+                );
+                if reference.is_some() {
+                    bundle.leaves_discarded = Some(leaves_discarded);
+                    bundle.reached_keys = reached_keys;
+                }
+                (verdict, reference)
+            }
         },
     };
 
@@ -887,6 +1018,116 @@ pub fn verify_anchored_package_with_chain(
         completitud,
         identity: Some(identity),
         truncation_reference,
+    }
+}
+
+/// [`AnchoredPackageReport`] plus what became of the submitter signatures.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KitPackageReport {
+    pub report: AnchoredPackageReport,
+    /// How many signatures verified. `None`: none was looked at, because the kit is
+    /// a v1, or the package had failed already, or `kit_gap` says why.
+    pub signatures_checked: Option<usize>,
+    /// A key derived from the rotations of the package or of the monitor bundle that
+    /// the kit has no public key for. The auditor's input is at fault and CONSISTENCIA
+    /// is left `Inconclusive`: the signatures were not all checked, so it cannot be
+    /// `Verified`, and nothing says that they are bad.
+    pub kit_gap: Option<[u8; 32]>,
+    /// How many leaves of the monitor bundle are in the log under a key of the kit
+    /// without its signature, and so were left out of COMPLETITUD. `None`: the rules
+    /// did not run, or the kit is a v1 and no leaf of the bundle was read.
+    pub monitor_leaves_discarded: Option<usize>,
+}
+
+/// [`verify_anchored_package_with_chain`] under the kit, public keys included:
+/// with a v2 kit, the signature of every anchored leaf and of every followed
+/// rotation is checked as well, and one that does not verify turns CONSISTENCIA
+/// into `Failed`, whatever COMPLETITUD found. With a v1 kit, the report is that
+/// function's, unchanged, and `signatures_checked` says so.
+///
+/// The signatures come after everything else on purpose: until inclusion and
+/// identity hold, a submitter is a claim of the file, and a key the kit lacks says
+/// nothing about the leaf of a stranger.
+///
+/// The leaves of a monitor are the opposite case, because the rules take their lanes
+/// as seen: with a v2 kit, a leaf that is in the log under a key of the kit without
+/// its signature does not count for COMPLETITUD, neither to accuse nor to absolve,
+/// and `monitor_leaves_discarded` says how many. That gives nobody a new power, since
+/// whoever writes a bundle can already leave a leaf out: its completeness is a trusted
+/// input. A leaf that does not include under `C_audit` or does not serialize is not
+/// discarded: the bundle is corrupt and COMPLETITUD is FAILED, under either kit.
+///
+/// A leaf under any other key stays, as it always did: nothing can check it, and it
+/// is the alien leaf the rules exist to catch. But the rules also derive an identity,
+/// from the rotations of the bundle, and a key of that identity makes such a leaf
+/// count as the producer's. So every key the rules reached has to be in the kit, like
+/// the keys of the package, or the run is a `kit_gap`: what those leaves decided
+/// rests on signatures nobody could read. With a v1 kit no leaf is read, so a made-up
+/// one can accuse and can absolve.
+pub fn verify_anchored_package_with_kit(
+    kit: &AuditorKit,
+    pkg: &AnchorPackage,
+    monitor: Option<&MonitorAudit>,
+    published_chain: Option<&[PublicChainRow]>,
+) -> KitPackageReport {
+    let mut bundle = BundleFindings::default();
+    let mut report = package_report(
+        &kit.tenant_slug,
+        kit.genesis_key_hash,
+        &kit.policy,
+        pkg,
+        monitor,
+        published_chain,
+        &kit.identity_pubkeys,
+        &mut bundle,
+    );
+    let monitor_leaves_discarded = bundle
+        .leaves_discarded
+        .filter(|_| !kit.identity_pubkeys.is_empty());
+    let derived = match (&report.consistencia, &report.identity) {
+        (Verdict::Verified, Some(identity)) if !kit.identity_pubkeys.is_empty() => identity,
+        _ => {
+            return KitPackageReport {
+                report,
+                signatures_checked: None,
+                kit_gap: None,
+                monitor_leaves_discarded,
+            }
+        }
+    };
+    let checked = check_submitter_signatures(
+        &kit.identity_pubkeys,
+        &derived.keys,
+        &pkg.rotations,
+        &pkg.anchored_leaves,
+    )
+    .and_then(|count| {
+        match key_missing_from_kit(&kit.identity_pubkeys, &bundle.reached_keys) {
+            Some(key_hash) => Err(SignatureFailure::KitGap { key_hash }),
+            None => Ok(count),
+        }
+    });
+    let (signatures_checked, kit_gap) = match checked {
+        Ok(count) => (Some(count), None),
+        Err(SignatureFailure::Invalid { reason }) => {
+            report.consistencia = Verdict::Failed { reason };
+            (None, None)
+        }
+        Err(SignatureFailure::KitGap { key_hash }) => {
+            report.consistencia = Verdict::Inconclusive {
+                reason: format!(
+                    "the kit pins no public key for the derived identity key {}",
+                    hex::encode(key_hash)
+                ),
+            };
+            (None, Some(key_hash))
+        }
+    };
+    KitPackageReport {
+        report,
+        signatures_checked,
+        kit_gap,
+        monitor_leaves_discarded,
     }
 }
 
@@ -1542,13 +1783,133 @@ mod tests {
 
     #[test]
     fn kit_rejects_unsupported_version() {
-        let json = minimal_kit_json().replace("anchor-kit/v1", "anchor-kit/v2");
+        let json = minimal_kit_json().replace("anchor-kit/v1", "anchor-kit/v3");
         assert_eq!(
             parse_auditor_kit(&json).unwrap_err(),
             KitError::UnsupportedVersion {
-                got: "seetrex/anchor-kit/v2".to_string()
+                got: "seetrex/anchor-kit/v3".to_string()
             }
         );
+    }
+
+    // ---- auditor kit v2 -------------------------------------------------------
+
+    const FC2_PK: &str = "20ce1351a70e420b3cf912b857974565e5b60196645f85f6622aabf9d85387b8";
+    const FC3_PK: &str = "6a927389f18a96cb7d8776de01c270453f4210bccbd28345bfa503c3cd7d87f1";
+
+    /// A kit of `version` over the genesis of the FC2 leaf, with `pubkeys` as the
+    /// raw text of `identity_pubkeys`, or without the key at all.
+    fn kit_v2_json(version: &str, pubkeys: Option<&str>) -> String {
+        let field = pubkeys.map_or(String::new(), |p| format!(r#""identity_pubkeys": {p},"#));
+        format!(
+            r#"{{ "version": "{version}", "tenant_slug": "example-tenant",
+               "genesis_key_hash": "{FC2_HEAD_KH}", {field}
+               "policy": {{ "log_pubkey": "{LOG_PK}",
+                 "witnesses": ["{WIT_NISSE}", "{WIT_RGDD}", "{WIT_SMARTIT}"], "quorum_k": 2 }} }}"#,
+        )
+    }
+
+    const V2: &str = "seetrex/anchor-kit/v2";
+
+    /// INTENT: a kit v2 is usable from the day it is read: it pins at least one
+    ///   key, each entry can verify a signature, none repeats, and one of them is
+    ///   the key of the genesis the kit follows. Every other shape is exit 2, here
+    ///   and not on a verdict about the vendor.
+    /// CONTEXT: the kit is hand-composed by the auditor from a template, and the
+    ///   public keys are its only new trust input.
+    /// EXPIRES IF: the kit stops being the source of the public keys.
+    #[test]
+    fn test_intent_kit_v2_rejects_key_not_matching_genesis() {
+        let json = kit_v2_json(V2, Some(&format!(r#"["{FC3_PK}"]"#)));
+        assert_eq!(parse_auditor_kit(&json).unwrap_err(), KitError::GenesisKeyNotInKit);
+    }
+
+    /// INTENT: the control of the test above: the genesis key is found wherever it is.
+    /// CONTEXT: after a rotation the list has more than one key, in no fixed order.
+    /// EXPIRES IF: the kit gives `identity_pubkeys` an order.
+    #[test]
+    fn test_intent_kit_v2_accepts_genesis_key_in_any_position() {
+        let json = kit_v2_json(V2, Some(&format!(r#"["{FC3_PK}", "{FC2_PK}"]"#)));
+        let kit = parse_auditor_kit(&json).expect("the genesis key need not come first");
+        assert_eq!(kit.identity_pubkeys, vec![h32(FC3_PK), h32(FC2_PK)]);
+    }
+
+    /// INTENT: a v2 kit without keys is refused, not read as a v1 that checks nothing.
+    /// CONTEXT: an empty list is how the library spells v1, so the parser must not
+    ///   let a kit that says v2 reach that state.
+    /// EXPIRES IF: v2 stops requiring the field.
+    #[test]
+    fn test_intent_kit_v2_requires_identity_pubkeys() {
+        for pubkeys in [None, Some("[]"), Some("null")] {
+            assert_eq!(
+                parse_auditor_kit(&kit_v2_json(V2, pubkeys)).unwrap_err(),
+                KitError::IdentityPubkeysRequired,
+                "{pubkeys:?}"
+            );
+        }
+    }
+
+    /// INTENT: a v1 kit with keys is refused: the auditor believes signatures are
+    ///   checked, and they would not be.
+    /// CONTEXT: one version, one meaning; that is why v2 is a version and not a field.
+    ///   `null` is the key being there, like `[]`: serde reads it as absent unless
+    ///   told otherwise, and a v1 kit with the key passed that way.
+    /// EXPIRES IF: v1 kits are retired from the parser.
+    #[test]
+    fn test_intent_kit_v1_refuses_identity_pubkeys() {
+        let pubkeys = format!(r#"["{FC2_PK}"]"#);
+        for field in [pubkeys.as_str(), "[]", "null"] {
+            assert_eq!(
+                parse_auditor_kit(&kit_v2_json(ANCHOR_KIT_VERSION, Some(field))).unwrap_err(),
+                KitError::IdentityPubkeysInV1Kit,
+                "{field}"
+            );
+        }
+    }
+
+    /// INTENT: a v1 kit in an auditor's hands parses to the same values as before.
+    /// CONTEXT: a v1 kit keeps working with `verify-anchor`.
+    /// EXPIRES IF: v1 kits are retired from the parser.
+    #[test]
+    fn test_intent_kit_v1_parses_as_it_always_did() {
+        let kit = parse_auditor_kit(&kit_v2_json(ANCHOR_KIT_VERSION, None)).expect("v1 parses");
+        assert_eq!(kit.genesis_key_hash, h32(FC2_HEAD_KH));
+        assert!(kit.identity_pubkeys.is_empty());
+    }
+
+    /// INTENT: a repeated key is a transcription error and is refused by name.
+    /// CONTEXT: the list is copied by hand; a repeat hides the key that is missing.
+    /// EXPIRES IF: the kit stops being composed by hand.
+    #[test]
+    fn test_intent_kit_v2_refuses_duplicates() {
+        let json = kit_v2_json(V2, Some(&format!(r#"["{FC2_PK}", "{FC2_PK}"]"#)));
+        assert_eq!(
+            parse_auditor_kit(&json).unwrap_err(),
+            KitError::DuplicateIdentityPubkey { value: FC2_PK.to_string() }
+        );
+    }
+
+    /// INTENT: an entry that cannot verify a signature is refused when the kit is read.
+    /// CONTEXT: otherwise it surfaces later as a vendor failure, exit 1, on a kit error.
+    /// EXPIRES IF: the signature scheme of the log changes.
+    #[test]
+    fn test_intent_kit_v2_refuses_what_cannot_verify() {
+        // The high bit clear and y = 2: not on the curve.
+        let not_a_point = format!("02{}", "00".repeat(31));
+        // The identity: on the curve, of small order, and it would sign anything.
+        let small_order = format!("01{}", "00".repeat(31));
+        for value in [not_a_point, small_order] {
+            let json = kit_v2_json(V2, Some(&format!(r#"["{FC2_PK}", "{value}"]"#)));
+            assert_eq!(
+                parse_auditor_kit(&json).unwrap_err(),
+                KitError::InvalidIdentityPubkey { value }
+            );
+        }
+        let json = kit_v2_json(V2, Some(r#"["zz"]"#));
+        assert!(matches!(
+            parse_auditor_kit(&json),
+            Err(KitError::InvalidHex { field: "identity_pubkeys", .. })
+        ));
     }
 
     #[test]

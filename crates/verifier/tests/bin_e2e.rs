@@ -740,6 +740,43 @@ fn test_scenario_verify_anchor_confirmed_offline_no_reserved_token() {
     );
 }
 
+/// INTENT: a real package of `test.sigsum.org`, signed by a key that was thrown away,
+///   verifies its signature end to end under a v2 kit, and one bit off in the kit's
+///   key is a kit error, exit 2, not a verdict.
+/// CONTEXT: everything else that reaches this path is signed by the tests. This is
+///   the captured leaf 196829, its checkpoint and its key, in the auditor's two files.
+/// EXPIRES IF: the fixture's log stops being a valid example of the format.
+#[test]
+fn test_intent_real_package_signature_verifies_under_kit_v2() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/fc2_head");
+    let anchor = dir.join("anchor.json");
+    let kit = dir.join("kit_v2.json");
+    let out = run(&[
+        "verify-anchor",
+        anchor.to_str().unwrap(),
+        "--kit",
+        kit.to_str().unwrap(),
+    ]);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(0), "{stdout}\n{}", String::from_utf8_lossy(&out.stderr));
+    assert!(stdout.contains("submitter signatures:    1 checked"), "{stdout}");
+
+    let tmp = tempdir();
+    let wrong = tmp.path().join("kit.json");
+    let mut k: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&kit).unwrap()).unwrap();
+    k["identity_pubkeys"] =
+        serde_json::json!(["20ce1351a70e420b3cf912b857974565e5b60196645f85f6622aabf9d85387b9"]);
+    write(&wrong, &k);
+    let out = run(&[
+        "verify-anchor",
+        anchor.to_str().unwrap(),
+        "--kit",
+        wrong.to_str().unwrap(),
+    ]);
+    assert_eq!(out.status.code(), Some(2), "{}", String::from_utf8_lossy(&out.stderr));
+}
+
 /// A kit auditing a DIFFERENT tenant than the package declares ⇒ the category
 /// guard fails CONSISTENCIA ⇒ exit 1 (a package failure, not a config error),
 /// and the reserved token must not leak on the failure path either.
@@ -823,7 +860,7 @@ fn verify_anchor_missing_kit_is_usage_error() {
 
 // ─── verify-anchor --monitor: real enumeration round-trip ────────────────
 //
-// These feed the REAL `scripts/gate46/fb2c_enumeration_oracle.json` monitor
+// These feed the REAL `dabc2d77:scripts/gate46/fb2c_enumeration_oracle.json` monitor
 // bundle (a FULL-SCAN enumeration under the real SUBMITTER_KH against
 // test.sigsum.org) into the CLI so COMPLETITUD becomes a REAL verdict, not the
 // offline INCONCLUSIVE default. `consistency_proof` in the oracle is `[]`
@@ -941,6 +978,9 @@ fn test_intent_verify_anchor_lag_without_chain_is_inconclusive_exit_0() {
         Some(0),
         "an undecidable lag must not be an accusation; combined={combined}"
     );
+    // The control of the v1 path: the key of this genesis (`b112398d`) was not kept,
+    // so this package can only ever be read with its signatures unchecked.
+    assert!(combined.contains("submitter signatures:    NOT CHECKED"), "{combined}");
     let verdict = completitud_line(&combined);
     assert!(
         completitud_class(&combined) == "INCONCLUSIVE" && verdict.contains("G-v6-2 UNDECIDED"),

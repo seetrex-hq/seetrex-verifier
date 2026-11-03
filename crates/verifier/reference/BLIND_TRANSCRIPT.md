@@ -35,7 +35,9 @@ What an auditor can verify from here:
 | 2026-08-30 | `681d382872d18b864921947edf3bc7060a27741af06af274289f82e75f97ded7` | `383451fe` | after the R2b clarifications: 4.1 Money measured against the reference -- `_` ignored once a digit has appeared (so `1000._5` is monetary), no whitespace trimming, exponent-free scale reduced below 28 until the mantissa fits 2^96, and the exponent form split in two (exact, with a 29-digit written budget; and, past 28 fractional digits, mantissa rounded and exponent discarded) |
 | 2026-08-30 | `91f2915818c64575373b43acb43ea23e24b65f6a7b5980dd0cd6c4a70058fcad` | `d6b36b34` | after the R3 clarifications: 4.1 Money names the decimal library version the procedure was measured against (`rust_decimal` 1.37.2, pinned exactly), its exponent rule becomes ONE bullet with three outcomes decided by what the exponent-free rule does to the mantissa -- String, exact fold, or round-and-discard -- instead of by the mantissa fractional-digit count, which was wrong for twelve measured values and decided `7.9228162514264337593543950336e28` twice; Date accepts a signed year and Date-time the colon-less `+HHMM` offset |
 | 2026-08-30 | `7ea0fa101734a679c620c1c9f5d3d6c8959999f4831d44e8705d4a8a2fc9d768` | `3c190523` | after the R3b clarification: a leading `-` signs only a ZERO year (`-2026-05-13` reaches String), the one reading the blind aligner had flagged as decided by sentence rather than by witness |
-| 2026-08-30 | `2059f53a2353058d3507149bd1b5bb1625bc9632c75b7000ad899d09806a7f9c` | `HEAD` | after the merge into main: the status line no longer says "pending adversarial review" (this reference implementation and its two instruments were that review); it names the reference limits and the dependency pins, and warns holders of earlier copies |
+| 2026-08-30 | `2059f53a2353058d3507149bd1b5bb1625bc9632c75b7000ad899d09806a7f9c` | `40ac3121` | after the merge into main: the status line no longer says "pending adversarial review" (this reference implementation and its two instruments were that review); it names the reference limits and the dependency pins, and warns holders of earlier copies |
+| 2026-11-01 | `73ecb1a51f71d18427576aa7c63f429559e3ac0a98a7f0a2eb886277048aea17` | `1429e439` | an informative note in 8.1 on `oss-batches-chain.json`: its `verdict_outcome` and `ruleset_id` are batch metadata, its `verdict_hash` is a Merkle root, and neither the file nor `verify-record` is published yet. No MUST moved and the reference implementation was not touched |
+| 2026-11-02 | `78adcd64e681d3ac3411e34c8a214e9dc01063f07f8a772365338fc0b1da35e5` | `HEAD` | an informative note in 8.1 reworded at the release `0.3.8`: `verify-record` arrives with that release, and the sentence no longer says it is not published; no normative text changed |
 
 **Every row but the last names the COMMIT whose
 `docs/SPEC_VERDICT_PACKAGE_V1.md` hashes to it**, and
@@ -47,11 +49,11 @@ that contains it: it is pinned against the WORKING TREE instead, which is the
 check that already stood.
 
 The first row is the document as the implementer read it; the last is the
-document at this commit. Every row after the first exists because a divergence
-between the two legs was classified as a **specification** correction, so the
-bytes moved after the implementation was frozen -- the first of them was
-DIV-01 (hash recomputation over the recovered and re-serialized canonical
-value).
+document at this commit. Every row after the first exists because the bytes
+moved after the implementation was frozen, and all but the last of them because
+a divergence between the two legs was classified as a **specification**
+correction -- the first was DIV-01 (hash recomputation over the recovered and
+re-serialized canonical value). The rows of 2026-11-01 and 2026-11-02 are informative notes.
 
 Correcting the document and re-aligning the Python are deliberately TWO acts,
 in that order: classifying before editing is what preserves the evidence, and

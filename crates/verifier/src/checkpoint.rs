@@ -31,6 +31,10 @@
 //!   `SHA256(0x00 || checksum(32) || signature(64) || key_hash(32))`
 //! * A Sigsum key hash is `SHA256(raw 32-byte Ed25519 public key)`; the
 //!   `<root-b64>` is standard base64 (RFC 4648 §4) of the 32-byte root.
+//! * Leaf signature (the SUBMITTER signs, Ed25519):
+//!   `"sigsum.org/v1/tree-leaf" || 0x00 || checksum(32)`, 56 bytes. Measured
+//!   against real leaves of `test.sigsum.org` and of the production log; see
+//!   `test_intent_real_sigsum_leaf_signatures_verify`.
 //!
 //! `ed25519-dalek` is VERIFY-ONLY here (`VerifyingKey::verify_strict`); this
 //! crate never signs — a deliberate, standing design decision.
@@ -93,9 +97,20 @@ pub enum CheckpointError {
     QuorumNotMet { have: usize, need: usize },
 }
 
+/// The domain of a Sigsum leaf signature. A signature made under it cannot be
+/// replayed as a signature over any other Sigsum message.
+pub const SIGSUM_LEAF_NAMESPACE: &str = "sigsum.org/v1/tree-leaf";
+
 /// A Sigsum key hash: `SHA256(raw 32-byte Ed25519 public key)`.
-fn key_hash(pubkey: &[u8; 32]) -> [u8; 32] {
+pub(crate) fn key_hash(pubkey: &[u8; 32]) -> [u8; 32] {
     Sha256::digest(pubkey).into()
+}
+
+/// Whether `pubkey` can ever verify a signature under [`ed25519_verify`]: a valid
+/// point that is not of small order. A key of small order passes
+/// `VerifyingKey::from_bytes` and is refused by `verify_strict`.
+pub(crate) fn is_usable_pubkey(pubkey: &[u8; 32]) -> bool {
+    VerifyingKey::from_bytes(pubkey).is_ok_and(|vk| !vk.is_weak())
 }
 
 /// Standard base64 (RFC 4648 §4, `=`-padded) of arbitrary bytes. Hand-rolled
@@ -178,6 +193,128 @@ pub fn tree_leaf_hash(checksum: &[u8; 32], signature: &[u8; 64], key_hash: &[u8;
     leaf_data.extend_from_slice(signature);
     leaf_data.extend_from_slice(key_hash);
     crate::merkle::leaf_hash(&leaf_data)
+}
+
+/// The exact bytes a SUBMITTER signs for a leaf:
+/// [`SIGSUM_LEAF_NAMESPACE`] `|| 0x00 || checksum`.
+fn leaf_signed_bytes(checksum: &[u8; 32]) -> Vec<u8> {
+    let mut message = Vec::with_capacity(SIGSUM_LEAF_NAMESPACE.len() + 1 + checksum.len());
+    message.extend_from_slice(SIGSUM_LEAF_NAMESPACE.as_bytes());
+    message.push(0);
+    message.extend_from_slice(checksum);
+    message
+}
+
+/// Whether `signature` is the signature of the key `pubkey` over a Sigsum leaf
+/// with this `checksum`, and `pubkey` is the key `submitter_key_hash` names. The
+/// key comes from the auditor's kit: neither `anchor.json` nor the log carries it.
+pub fn verify_submitter_signature(
+    pubkey: &[u8; 32],
+    submitter_key_hash: &[u8; 32],
+    checksum: &[u8; 32],
+    signature: &[u8; 64],
+) -> bool {
+    key_hash(pubkey) == *submitter_key_hash
+        && ed25519_verify(pubkey, &leaf_signed_bytes(checksum), signature)
+}
+
+/// Why [`check_submitter_signatures`] refused.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SignatureFailure {
+    /// A signature does not verify: the vendor's material is at fault.
+    Invalid { reason: String },
+    /// The kit has no public key for this derived key hash: the auditor's input
+    /// is at fault, and nothing is said about the signatures it would check.
+    KitGap { key_hash: [u8; 32] },
+}
+
+/// A rotation the identity derivation followed: submitted by the old key it
+/// names, and that key is on the chain from the pinned genesis. The others are the
+/// surfaced anomalies, and their signatures are not read: the kit has no reason to
+/// know their keys, and may hold them all the same.
+fn is_followed_rotation(leaf: &AnchoredLeaf, identity_keys: &[[u8; 32]]) -> bool {
+    matches!(&leaf.lane, Lane::Rotate { key_hash_old, .. }
+        if *key_hash_old == hex::encode(leaf.submitter_key_hash))
+        && identity_keys.contains(&leaf.submitter_key_hash)
+}
+
+/// The signature of `leaf` under `pubkey`, over the checksum of its own fact.
+fn leaf_signature_holds(pubkey: &[u8; 32], leaf: &AnchoredLeaf) -> bool {
+    serialize_preimage(&leaf.lane).is_ok_and(|preimage| {
+        let checksum = leaf_checksum(&preimage);
+        verify_submitter_signature(
+            pubkey,
+            &leaf.submitter_key_hash,
+            &checksum,
+            &leaf.submitter_signature,
+        )
+    })
+}
+
+/// Whether a key of the kit is named by `leaf` and its signature does not hold. A
+/// leaf under any other key is not refuted: the kit has nothing to say about it.
+///
+/// For a leaf already bound to the log, so known to serialize: on any other, a
+/// `true` here would blame the signature for a defect of the leaf.
+pub(crate) fn kit_refutes_leaf(identity_pubkeys: &[[u8; 32]], leaf: &AnchoredLeaf) -> bool {
+    identity_pubkeys
+        .iter()
+        .find(|pk| key_hash(pk) == leaf.submitter_key_hash)
+        .is_some_and(|pubkey| !leaf_signature_holds(pubkey, leaf))
+}
+
+/// Check the submitter signature of every leaf in `leaves` and of every followed
+/// rotation in `rotations`, under the public keys of the kit. Returns how many were
+/// checked. To be called after inclusion and identity: `identity_keys` is the
+/// derived set and `leaves` are already bound to it.
+///
+/// Every key of `identity_keys` must be in the kit, used or not, because the kit is
+/// what pins the identity. An invalid signature outranks a gap: a forged rotation
+/// to a key nobody has must read as forged, not as a kit to complete. The bad
+/// signature would be found whatever the order, since the rotations are walked
+/// whole, so the gap is only reported at the end.
+pub(crate) fn check_submitter_signatures(
+    identity_pubkeys: &[[u8; 32]],
+    identity_keys: &[[u8; 32]],
+    rotations: &[AnchoredLeaf],
+    leaves: &[AnchoredLeaf],
+) -> Result<usize, SignatureFailure> {
+    let pubkey_of =
+        |hash: &[u8; 32]| identity_pubkeys.iter().find(|pk| key_hash(pk) == *hash);
+    let followed = rotations
+        .iter()
+        .filter(|leaf| is_followed_rotation(leaf, identity_keys));
+    let mut checked = 0;
+    for leaf in followed.chain(leaves) {
+        let Some(pubkey) = pubkey_of(&leaf.submitter_key_hash) else {
+            continue; // Reported below: every submitter here is in `identity_keys`.
+        };
+        if !leaf_signature_holds(pubkey, leaf) {
+            return Err(SignatureFailure::Invalid {
+                reason: format!(
+                    "the submitter signature of log leaf {} does not verify under the key the \
+                     kit pins for {}",
+                    leaf.index,
+                    hex::encode(leaf.submitter_key_hash)
+                ),
+            });
+        }
+        checked += 1;
+    }
+    match key_missing_from_kit(identity_pubkeys, identity_keys) {
+        Some(key_hash) => Err(SignatureFailure::KitGap { key_hash }),
+        None => Ok(checked),
+    }
+}
+
+/// The first of `keys` no public key of the kit hashes to.
+pub(crate) fn key_missing_from_kit(
+    identity_pubkeys: &[[u8; 32]],
+    keys: &[[u8; 32]],
+) -> Option<[u8; 32]> {
+    keys.iter()
+        .find(|hash| !identity_pubkeys.iter().any(|pk| key_hash(pk) == **hash))
+        .copied()
 }
 
 /// Verify a cosigned checkpoint against a PINNED policy. Returns the
@@ -290,9 +427,10 @@ pub struct AnchoredLeaf {
 ///       included in the tree at the AUTHENTICATED root.
 ///
 /// Note: the submitter SIGNATURE is folded into the leaf hash (it is part of
-/// the Sigsum leaf) but is NOT verified against a producer key here — identity
-/// is bound by the `submitter_key_hash` set-membership check (0b), not by
-/// re-verifying the submission signature.
+/// the Sigsum leaf) but is NOT verified against a producer key here: this
+/// function has no public key, only the `submitter_key_hash` set of (0b). The
+/// signature is checked by the callers that hold the public keys of a v2 kit,
+/// through [`verify_submitter_signature`].
 ///
 /// What it turns [`crate::merkle::verify_inclusion`] into: a leaf whose root is
 /// authenticated by the pinned quorum AND that is bound to our producer
@@ -305,45 +443,8 @@ pub fn verify_anchored_inclusion(
     checkpoint: &Checkpoint,
     leaf: &AnchoredLeaf,
 ) -> Verdict {
-    // (0) slug↔tenant binding. The audited slug must itself be well-formed, and
-    // the leaf's slug must equal it. A `rotate` leaf (no slug) is not a
-    // per-tenant fact and is rejected by this single-tenant gate.
-    if !is_valid_slug(tenant_slug) {
-        return Verdict::Failed {
-            reason: format!("audited tenant slug is not a valid slug: {tenant_slug:?}"),
-        };
-    }
-    match leaf.lane.slug() {
-        Some(slug) if slug == tenant_slug => {}
-        Some(other) => {
-            return Verdict::Failed {
-                reason: format!(
-                    "leaf slug {other:?} does not match the audited tenant {tenant_slug:?} — \
-                     a leaf from the shared log belonging to a different tenant"
-                ),
-            }
-        }
-        None => {
-            return Verdict::Failed {
-                reason: "leaf has no tenant slug (rotate lane) — not a per-tenant anchored fact"
-                    .to_string(),
-            }
-        }
-    }
-
-    // (0b) producer-identity binding. Inclusion in the shared cosigned log does
-    // NOT make a leaf ours: a provider could submit a fabricated fact's checksum
-    // under a FRESH key and get a real inclusion proof. The leaf's submitter
-    // must be in the PINNED producer key set (the genesis key and its `rotate`
-    // rotations). Deriving that set by following the rotate lane from the
-    // pinned genesis is [`crate::anchor::derive_producer_identity_set`]'s job;
-    // the caller supplies it.
-    if !accepted_submitter_key_hashes.contains(&leaf.submitter_key_hash) {
-        return Verdict::Failed {
-            reason: "leaf submitter key is not in the pinned producer identity set — \
-                     inclusion in the shared log does not make the leaf ours"
-                .to_string(),
-        };
+    if let Err(failed) = check_leaf_binding(tenant_slug, accepted_submitter_key_hashes, leaf) {
+        return failed;
     }
 
     // (1) Authenticate the root under the pinned witness quorum.
@@ -356,6 +457,78 @@ pub fn verify_anchored_inclusion(
         }
     };
 
+    verify_fact_inclusion(leaf, checkpoint.size, root)
+}
+
+/// [`verify_anchored_inclusion`] for a caller that already holds the root
+/// [`verify_checkpoint`] authenticated for a tree of `size` leaves, so that one
+/// checkpoint is verified once however many leaves it is used for.
+pub(crate) fn verify_anchored_inclusion_under_root(
+    tenant_slug: &str,
+    accepted_submitter_key_hashes: &[[u8; 32]],
+    size: u64,
+    root: [u8; 32],
+    leaf: &AnchoredLeaf,
+) -> Verdict {
+    match check_leaf_binding(tenant_slug, accepted_submitter_key_hashes, leaf) {
+        Ok(()) => verify_fact_inclusion(leaf, size, root),
+        Err(failed) => failed,
+    }
+}
+
+/// Steps (0) and (0b) of [`verify_anchored_inclusion`]: nothing here touches the
+/// checkpoint.
+fn check_leaf_binding(
+    tenant_slug: &str,
+    accepted_submitter_key_hashes: &[[u8; 32]],
+    leaf: &AnchoredLeaf,
+) -> Result<(), Verdict> {
+    // (0) slug↔tenant binding. The audited slug must itself be well-formed, and
+    // the leaf's slug must equal it. A `rotate` leaf (no slug) is not a
+    // per-tenant fact and is rejected by this single-tenant gate.
+    if !is_valid_slug(tenant_slug) {
+        return Err(Verdict::Failed {
+            reason: format!("audited tenant slug is not a valid slug: {tenant_slug:?}"),
+        });
+    }
+    match leaf.lane.slug() {
+        Some(slug) if slug == tenant_slug => {}
+        Some(other) => {
+            return Err(Verdict::Failed {
+                reason: format!(
+                    "leaf slug {other:?} does not match the audited tenant {tenant_slug:?} — \
+                     a leaf from the shared log belonging to a different tenant"
+                ),
+            })
+        }
+        None => {
+            return Err(Verdict::Failed {
+                reason: "leaf has no tenant slug (rotate lane) — not a per-tenant anchored fact"
+                    .to_string(),
+            })
+        }
+    }
+
+    // (0b) producer-identity binding. Inclusion in the shared cosigned log does
+    // NOT make a leaf ours: a provider could submit a fabricated fact's checksum
+    // under a FRESH key and get a real inclusion proof. The leaf's submitter
+    // must be in the PINNED producer key set (the genesis key and its `rotate`
+    // rotations). Deriving that set by following the rotate lane from the
+    // pinned genesis is [`crate::anchor::derive_producer_identity_set`]'s job;
+    // the caller supplies it.
+    if !accepted_submitter_key_hashes.contains(&leaf.submitter_key_hash) {
+        return Err(Verdict::Failed {
+            reason: "leaf submitter key is not in the pinned producer identity set — \
+                     inclusion in the shared log does not make the leaf ours"
+                .to_string(),
+        });
+    }
+    Ok(())
+}
+
+/// Steps (2) and (3) of [`verify_anchored_inclusion`], under a root that step (1)
+/// has already authenticated.
+fn verify_fact_inclusion(leaf: &AnchoredLeaf, size: u64, root: [u8; 32]) -> Verdict {
     // (2) Re-derive the anchor checksum from the fact (Lane → preimage →
     // SHA256(SHA256(preimage))). An unexplained leaf FAILS here.
     let preimage = match serialize_preimage(&leaf.lane) {
@@ -371,13 +544,7 @@ pub fn verify_anchored_inclusion(
     // (3) Bind fact → Sigsum leaf → Merkle leaf, then prove inclusion against
     // the AUTHENTICATED root.
     let merkle_leaf = tree_leaf_hash(&checksum, &leaf.submitter_signature, &leaf.submitter_key_hash);
-    if crate::merkle::verify_inclusion(
-        leaf.index,
-        checkpoint.size,
-        merkle_leaf,
-        &leaf.inclusion_proof,
-        root,
-    ) {
+    if crate::merkle::verify_inclusion(leaf.index, size, merkle_leaf, &leaf.inclusion_proof, root) {
         Verdict::Verified
     } else {
         Verdict::Failed {
@@ -399,11 +566,12 @@ pub fn verify_anchored_inclusion(
 /// producer identity set (that would be circular — the set is being DERIVED from
 /// these very leaves). Its ONLY job is: authenticate the root, re-derive the
 /// checksum from the fact, bind it to the Sigsum leaf via [`tree_leaf_hash`], and
-/// prove inclusion. Sigsum binds the leaf's submitter `key_hash` to that same
-/// checksum (= SHA256 of the rotate PAYLOAD), so a verified inclusion
-/// cryptographically ties submitter↔payload — which is exactly what makes the
-/// derivation's `submitter_key_hash == key_hash_old` authorization test
-/// sound.
+/// prove inclusion. A verified inclusion says that the log holds this submitter
+/// `key_hash` next to this checksum, and no more: the derivation's
+/// `submitter_key_hash == key_hash_old` authorization test rests on that claim of
+/// the log. What ties the old key to the payload cryptographically is the
+/// signature, which this function cannot check for lack of a public key;
+/// [`verify_submitter_signature`] does, for a caller with a v2 kit.
 ///
 /// Returns the [`RotationRecord`] on a fully verified inclusion, or a
 /// `Verdict::Failed` (with a reason) otherwise. A non-`rotate` lane is a usage
@@ -413,21 +581,8 @@ pub fn verify_rotate_inclusion(
     checkpoint: &Checkpoint,
     leaf: &AnchoredLeaf,
 ) -> Result<RotationRecord, Verdict> {
-    // The gate is for the identity lane only. A per-tenant leaf here is misuse.
-    let (rot_ordinal, key_hash_old, key_hash_new) = match &leaf.lane {
-        Lane::Rotate {
-            rot_ordinal,
-            key_hash_old,
-            key_hash_new,
-        } => (*rot_ordinal, key_hash_old.clone(), key_hash_new.clone()),
-        other => {
-            return Err(Verdict::Failed {
-                reason: format!(
-                    "verify_rotate_inclusion called on a non-rotate lane: {other:?}"
-                ),
-            })
-        }
-    };
+    // The gate is for the identity lane only: this comes before any signature.
+    rotate_payload(leaf)?;
 
     // (1) Authenticate the root under the pinned witness quorum.
     let root = match verify_checkpoint(policy, checkpoint) {
@@ -438,6 +593,34 @@ pub fn verify_rotate_inclusion(
             })
         }
     };
+
+    verify_rotate_inclusion_under_root(checkpoint.size, root, leaf)
+}
+
+/// The rotate payload `(rot_ordinal, key_hash_old, key_hash_new)`. A per-tenant leaf
+/// at this gate is misuse.
+fn rotate_payload(leaf: &AnchoredLeaf) -> Result<(u64, String, String), Verdict> {
+    match &leaf.lane {
+        Lane::Rotate {
+            rot_ordinal,
+            key_hash_old,
+            key_hash_new,
+        } => Ok((*rot_ordinal, key_hash_old.clone(), key_hash_new.clone())),
+        other => Err(Verdict::Failed {
+            reason: format!("verify_rotate_inclusion called on a non-rotate lane: {other:?}"),
+        }),
+    }
+}
+
+/// [`verify_rotate_inclusion`] for a caller that already holds the root
+/// [`verify_checkpoint`] authenticated for a tree of `size` leaves, so that one
+/// checkpoint is verified once however many rotations it is used for.
+pub(crate) fn verify_rotate_inclusion_under_root(
+    size: u64,
+    root: [u8; 32],
+    leaf: &AnchoredLeaf,
+) -> Result<RotationRecord, Verdict> {
+    let (rot_ordinal, key_hash_old, key_hash_new) = rotate_payload(leaf)?;
 
     // (2) Re-derive the anchor checksum from the fact. An unexplained rotate
     // preimage FAILS here (defense in depth; the payload hex is also revalidated
@@ -455,13 +638,7 @@ pub fn verify_rotate_inclusion(
     // (3) Bind fact → Sigsum leaf → Merkle leaf, then prove inclusion against the
     // AUTHENTICATED root. Only if this holds is `submitter_key_hash` trustworthy.
     let merkle_leaf = tree_leaf_hash(&checksum, &leaf.submitter_signature, &leaf.submitter_key_hash);
-    if !crate::merkle::verify_inclusion(
-        leaf.index,
-        checkpoint.size,
-        merkle_leaf,
-        &leaf.inclusion_proof,
-        root,
-    ) {
+    if !crate::merkle::verify_inclusion(leaf.index, size, merkle_leaf, &leaf.inclusion_proof, root) {
         return Err(Verdict::Failed {
             reason: "rotate leaf is not included in the authenticated tree — its \
                      submitter identity is not attested by the cosigned log"
@@ -1098,5 +1275,166 @@ mod tests {
             "a leaf submitted under a key outside the pinned producer set must FAIL — \
              inclusion alone does not make it ours"
         );
+    }
+
+    // ---- the submitter signature --------------------------------------------
+
+    const FC2_PK: &str = "20ce1351a70e420b3cf912b857974565e5b60196645f85f6622aabf9d85387b8";
+    const ROT2_PK: &str = "58d91b51b1df73bbe2b3e40370194529c88163bebb907bb56fd3281fcfda6dda";
+    const FC3_PK: &str = "6a927389f18a96cb7d8776de01c270453f4210bccbd28345bfa503c3cd7d87f1";
+    const PROD_PK: &str = "7cf3a5c77562cd5cc7e0d2bd57847039044c2d19505a53c1b49e22e3d86bef43";
+
+    /// `(pubkey, checksum, signature)` of real leaves of `test.sigsum.org`, whose
+    /// keys were thrown away, so nothing here is Rust verifying Rust.
+    const REAL_SIGNED_LEAVES: &[(&str, &str, &str)] = &[
+        // FC2, `head`, leaf 196829.
+        (
+            FC2_PK,
+            "20329b355779897d731d706c0e997ae2ad3ea3fe25c316a727b8c52f757013aa",
+            "336cd348dd8e5ac7fbcfa10ea6258c3fbacf1ea94aa3bfb23844327db88113b1b654274ab76fc8af569d8c5f35d20ea8ad8ea095d63168a62e462618b035bf0c",
+        ),
+        // The authorized `rotate`, leaf 196700, signed by the old key.
+        (
+            ROT2_PK,
+            "c54b5b96706c01156041e5b29956c1cb324ef6490b639f1abbb8bcf7e904421d",
+            "7dc0167164586471a6e002498713c96c5ce805137f0fdc2da4f43b462cad22c448cc999c350565284d587f77cada5f24e49b0f34451081ce04acee9a2f226e0a",
+        ),
+        // FC3, `enroll`, `head` and `retired`, leaves 197019-21.
+        (
+            FC3_PK,
+            "3efc82181c010b82cc1b9aee35891a520b9bb1153a18dcdee0c77eb35dba2318",
+            "e7e8df6f2f4b3d474f8ed19936fa3add493f9411aa31d880e172be9d6665474747dcb24c8f60470e92b094b5974010c8574737f89d566c2b702a97cc8575f307",
+        ),
+        (
+            FC3_PK,
+            "dde171b5ac24f552ed64f23a34a0f2c975177d2b0e5fd8c77af47c557a1fea2d",
+            "0710a3136da6ea8e6483a0d3f3eaefd51a87b1a08c5e94105b3231a3ad8c0106b3e411936193ec3b850a307575d45ef78d1d1b09233d682abb987234a8c7b40a",
+        ),
+        (
+            FC3_PK,
+            "156b858e78df612cf897ffb11d622a25bccd1728ed9cbe5b075be2f61f52dcdf",
+            "acfd6fc3e5c0c4a5cdcd4c0758e765bdb06efcb2f94070b80dcffc246ddcc1f68c4f371bd4dfae3a9ef317023c8dfa692ba14052ad9751e576193876943b6509",
+        ),
+    ];
+
+    /// The tenant `seetrex-compliance` in the production log, leaves 61957 and 61958.
+    fn prod_signed_leaves() -> [(Lane, &'static str); 2] {
+        [
+            (
+                Lane::Enroll {
+                    slug: "seetrex-compliance".to_string(),
+                    mode: crate::anchor::Mode::Attested,
+                },
+                "a605baaae3a9e86cda5fdaa1e535d723c804e4f9c3dbfabcbf0d3b54e4264f19370187e3feb96f96690ac0b530f5e090ea2f0207f22e022f7fa26aec282c1b0c",
+            ),
+            (
+                Lane::Head {
+                    slug: "seetrex-compliance".to_string(),
+                    ordinal: 2,
+                    chain_hash: "5d547931fabe27e49466e1d15115bb77552dad2679c09347b6e6fe657db574ed"
+                        .to_string(),
+                },
+                "3bdf235e208936c5f67a731225e600043eab9aa97e93b6268c6c4a24fce6d5d00033935b51d17a111cb9cae3745f70f69135f53d924a12449aacc7766835b400",
+            ),
+        ]
+    }
+
+    /// INTENT: the bytes a submitter signs are written here exactly as Sigsum signs
+    ///   them: a real signature of every lane verifies, in both logs, under the
+    ///   public key, and it stops verifying if the checksum or the signature moves.
+    /// CONTEXT: the leaf signature went unchecked until the 0.3.8, so the operator
+    ///   of the log could hold a leaf nobody signed.
+    /// EXPIRES IF: Sigsum changes its leaf format, which is a new log, not this one.
+    #[test]
+    fn test_intent_real_sigsum_leaf_signatures_verify() {
+        for (pk, checksum, signature) in REAL_SIGNED_LEAVES {
+            let (pk, checksum, signature) = (h32(pk), h32(checksum), h64(signature));
+            let kh = key_hash(&pk);
+            assert!(verify_submitter_signature(&pk, &kh, &checksum, &signature));
+
+            let mut other_fact = checksum;
+            other_fact[0] ^= 1;
+            assert!(!verify_submitter_signature(&pk, &kh, &other_fact, &signature));
+            let mut other_signature = signature;
+            other_signature[0] ^= 1;
+            assert!(!verify_submitter_signature(&pk, &kh, &checksum, &other_signature));
+        }
+        let pk = h32(PROD_PK);
+        let kh = h32("85b052121ca91072fecc37279ff503588e4f034ea1fd6405e0a59cbcbb2fc406");
+        assert_eq!(key_hash(&pk), kh);
+        for (lane, signature) in prod_signed_leaves() {
+            let checksum = leaf_checksum(&serialize_preimage(&lane).unwrap());
+            assert!(verify_submitter_signature(&pk, &kh, &checksum, &h64(signature)));
+        }
+    }
+
+    /// INTENT: the key that verifies is the key the leaf names. A signature valid
+    ///   under a key other than the one `submitter_key_hash` commits to fails.
+    /// CONTEXT: the public key comes from the kit and the hash from the leaf; the
+    ///   only thing joining them is this comparison.
+    /// EXPIRES IF: leaves stop naming their submitter by key hash.
+    #[test]
+    fn test_intent_signature_under_a_key_the_leaf_does_not_name_fails() {
+        let (pk, checksum, signature) = REAL_SIGNED_LEAVES[0];
+        let (pk, checksum, signature) = (h32(pk), h32(checksum), h64(signature));
+        let another_key = key_hash(&h32(FC3_PK));
+        assert!(!verify_submitter_signature(&pk, &another_key, &checksum, &signature));
+    }
+
+    /// INTENT: an invalid signature outranks a gap of the kit whatever the order the
+    ///   presenter chose: the leaf with no key comes first here, and the run still
+    ///   reads as a forgery, not as a kit to complete.
+    /// CONTEXT: the order of the rotations and leaves is the file's, and exit 2 sends
+    ///   the auditor to fetch a key, which is the wrong errand for a forged leaf.
+    /// EXPIRES IF: a derived key absent from the kit stops being the auditor's error.
+    #[test]
+    fn test_intent_invalid_signature_outranks_a_kit_gap_in_any_order() {
+        let leaf = |pk: &str| AnchoredLeaf {
+            lane: Lane::Enroll {
+                slug: "example-tenant".to_string(),
+                mode: crate::anchor::Mode::Attested,
+            },
+            submitter_signature: [0x55; 64],
+            submitter_key_hash: key_hash(&h32(pk)),
+            index: 0,
+            inclusion_proof: vec![],
+        };
+        let no_key_in_kit = leaf(FC2_PK);
+        let forged = leaf(FC3_PK);
+        let identity = [no_key_in_kit.submitter_key_hash, forged.submitter_key_hash];
+        let outcome =
+            check_submitter_signatures(&[h32(FC3_PK)], &identity, &[], &[no_key_in_kit, forged]);
+        assert!(matches!(outcome, Err(SignatureFailure::Invalid { .. })), "{outcome:?}");
+    }
+
+    /// INTENT: a key of small order signs nothing. The signature below holds for
+    ///   ANY message under the cofactorless `verify` and is refused by
+    ///   `verify_strict`: `s = 1`, `R = B`, `A =` the identity point, where
+    ///   `[s]B - [h]A = B` whatever `h` is. A non-canonical `S` does not tell the
+    ///   two apart: both refuse it.
+    /// CONTEXT: a universal forgery exists for such a key, and the kit is a text
+    ///   file. The kit refuses that key too; this is the layer under it.
+    /// EXPIRES IF: `ed25519_verify` stops being strict.
+    #[test]
+    fn test_intent_small_order_key_signs_nothing() {
+        use ed25519_dalek::Verifier;
+        let mut identity = [0u8; 32];
+        identity[0] = 1;
+        let mut signature = [0u8; 64];
+        signature[..32].copy_from_slice(&h32(
+            "5866666666666666666666666666666666666666666666666666666666666666",
+        ));
+        signature[32] = 1;
+        let checksum = [0xabu8; 32];
+
+        let lax = VerifyingKey::from_bytes(&identity)
+            .unwrap()
+            .verify(&leaf_signed_bytes(&checksum), &Signature::from_bytes(&signature));
+        assert!(lax.is_ok(), "the vector no longer tells the two checks apart");
+
+        let kh = key_hash(&identity);
+        assert!(!verify_submitter_signature(&identity, &kh, &checksum, &signature));
+        assert!(!is_usable_pubkey(&identity));
+        assert!(is_usable_pubkey(&h32(PROD_PK)));
     }
 }

@@ -133,9 +133,9 @@ Part II, point (8)). When a public distribution channel and an advisory channel
 are in place, they will be announced at <https://seetrex.com/security> and the
 claim will be made there, with the date it became true.
 
-Where technically feasible, new security updates are provided separately from
-functionality updates — Annex I, Part II, point (2) — so that taking a fix
-never requires taking a feature.
+Where technically feasible, new security updates are to be provided separately from functionality updates
+— Annex I, Part II, point (2). Today they are not: releases are cut from the main line, so a fix ships together
+with whatever else landed since the previous release. A security-only release line, once it exists, will be announced at <https://seetrex.com/security> with the date it started.
 
 ## Support period
 

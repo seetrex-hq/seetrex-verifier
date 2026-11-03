@@ -25,7 +25,7 @@
 //!    `U+FEFF`.
 //! 4. **Two-run stability** -- projecting one input twice in one process yields
 //!    the same bytes, which is what catches an unordered map iteration.
-//! 6. **Real-lockfile invariants** -- the four actual lockfiles of the PRIVATE
+//! 6. **Real-lockfile invariants** -- the three actual lockfiles of the PRIVATE
 //!    repository this crate is developed in project, re-canonicalise to
 //!    themselves, and satisfy the structural invariants, with **no count and
 //!    no hash pinned**: a dependency bump must never turn this file red.
@@ -38,7 +38,7 @@
 //! ## Obligation 5, platform independence, and how it is met here
 //!
 //! Continuous integration for this repository runs Linux runners only
-//! (`.forgejo/workflows/security.yml`), and the workspace test step
+//! (`.github/workflows/security.yml`), and the workspace test step
 //! `cargo test (workspace, lib + integration)` includes this crate's
 //! integration tests -- with `SEETREX_PRIVATE_TREE` set on that step, so
 //! obligation 6 runs there on every push too. The development machine these
@@ -746,7 +746,7 @@ struct RealLockfile {
     subject: &'static str,
 }
 
-const REAL_LOCKFILES: [RealLockfile; 4] = [
+const REAL_LOCKFILES: [RealLockfile; 3] = [
     RealLockfile {
         kind: "cargo",
         lockfile: "Cargo.lock",
@@ -765,15 +765,9 @@ const REAL_LOCKFILES: [RealLockfile; 4] = [
         manifest: None,
         subject: "pkg:npm/example-portal@1.0.0",
     },
-    RealLockfile {
-        kind: "npm",
-        lockfile: "frontend/package-lock.json",
-        manifest: None,
-        subject: "pkg:npm/example-frontend@1.0.0",
-    },
 ];
 
-/// INTENT: the four lockfiles this repository actually resolves project without
+/// INTENT: the three lockfiles this repository actually resolves project without
 ///   error, are their own canonical form, and satisfy every structural
 ///   invariant -- component order total, every bom-ref equal to its purl, every
 ///   reference resolving, no volatile key at any depth, a non-empty top-level

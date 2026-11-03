@@ -78,7 +78,7 @@ use crate::anchor::{
 };
 use crate::chain_export::PublicChainRow;
 use crate::checkpoint::{
-    tree_leaf_hash, verify_checkpoint, AnchoredLeaf, Checkpoint, WitnessPolicy,
+    kit_refutes_leaf, tree_leaf_hash, verify_checkpoint, AnchoredLeaf, Checkpoint, WitnessPolicy,
 };
 
 /// The monitor's enumeration: the leaves observed under our historic `key_hash`
@@ -1331,21 +1331,75 @@ pub fn verify_completitud_reported(
     policy: &WitnessPolicy,
     observations: &[SlugObservation],
 ) -> (Verdict, Option<TruncationReference>) {
+    let run = verify_completitud_under_keys(
+        audited_slug,
+        rows,
+        published_chain,
+        published_slug_lanes,
+        package_checkpoint_size,
+        package_checkpoint_root,
+        genesis_key_hash,
+        enumeration,
+        policy,
+        observations,
+        &[],
+    );
+    (run.verdict, run.reference)
+}
+
+/// What [`verify_completitud_under_keys`] found.
+pub(crate) struct CompletitudRun {
+    pub(crate) verdict: Verdict,
+    /// `None`: the rules never ran. See [`verify_completitud_reported`].
+    pub(crate) reference: Option<TruncationReference>,
+    /// Leaves in the log under a key of the kit whose signature does not hold, which
+    /// the rules did not see.
+    pub(crate) leaves_discarded: usize,
+    /// The keys this run reached from the genesis through the rotations it kept, in
+    /// order: the derived identity, up to the fork or the cycle when the derivation
+    /// refuses one, because a key up to there signed what made the refusal.
+    pub(crate) reached_keys: Vec<[u8; 32]>,
+}
+
+/// [`verify_completitud_reported`] under `identity_pubkeys`, the public keys of a
+/// kit: a leaf that includes under `C_audit` and names one of those keys without its
+/// signature does not reach the rules. Inclusion comes first, so a leaf that does not
+/// include or does not serialize is FAILED as it always was: a refuted signature is a
+/// fact about a leaf of the log, not about whatever a bundle presents. With no key,
+/// nothing is read and nothing is discarded.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn verify_completitud_under_keys(
+    audited_slug: &str,
+    rows: &[PublicChainRow],
+    published_chain: Option<&[PublicChainRow]>,
+    published_slug_lanes: &[Lane],
+    package_checkpoint_size: u64,
+    package_checkpoint_root: [u8; 32],
+    genesis_key_hash: [u8; 32],
+    enumeration: &MonitorEnumeration,
+    policy: &WitnessPolicy,
+    observations: &[SlugObservation],
+    identity_pubkeys: &[[u8; 32]],
+) -> CompletitudRun {
+    let refused = |verdict: Verdict| CompletitudRun {
+        verdict,
+        reference: None,
+        leaves_discarded: 0,
+        reached_keys: Vec::new(),
+    };
     if !is_valid_slug(audited_slug) {
-        return (
-            failed(format!("audited slug is not a valid slug: {audited_slug:?}")),
-            None,
-        );
+        return refused(failed(format!(
+            "audited slug is not a valid slug: {audited_slug:?}"
+        )));
     }
 
     // (1) Authenticate C_audit's root under the pinned witness quorum.
     let root = match verify_checkpoint(policy, &enumeration.c_audit) {
         Ok(root) => root,
         Err(e) => {
-            return (
-                failed(format!("C_audit not authenticated by pinned quorum: {e:?}")),
-                None,
-            )
+            return refused(failed(format!(
+                "C_audit not authenticated by pinned quorum: {e:?}"
+            )))
         }
     };
 
@@ -1354,9 +1408,14 @@ pub fn verify_completitud_reported(
     // not include, or does not serialize to a canonical v1 preimage, is FAILED.
     let mut auth_lanes: Vec<AuthLane> = Vec::with_capacity(enumeration.leaves.len());
     let mut rotate_records: Vec<RotationRecord> = Vec::new();
+    let mut leaves_discarded = 0;
     for leaf in &enumeration.leaves {
         if let Err(v) = authenticate_leaf_inclusion(&enumeration.c_audit, root, leaf) {
-            return (v, None);
+            return refused(v);
+        }
+        if kit_refutes_leaf(identity_pubkeys, leaf) {
+            leaves_discarded += 1;
+            continue;
         }
         match &leaf.lane {
             Lane::Rotate {
@@ -1409,7 +1468,42 @@ pub fn verify_completitud_reported(
         &fresh,
         slug_liveness,
     );
-    (verdict, Some(reference))
+    CompletitudRun {
+        verdict,
+        reference: Some(reference),
+        leaves_discarded,
+        reached_keys: keys_reached_from(genesis_key_hash, &rotate_records),
+    }
+}
+
+/// `genesis` and each key after it along the authorized rotations (submitted by their
+/// old key), stopping at a key with two distinct successors or at a repeated key.
+/// Unlike [`crate::anchor::derive_producer_identity_set`], it answers over a fork or a
+/// cycle too: keys on the way to a fork are as owed by a kit as any other, and the
+/// branches of the fork are not an identity of the producer.
+fn keys_reached_from(genesis: [u8; 32], rotations: &[RotationRecord]) -> Vec<[u8; 32]> {
+    let mut keys = vec![genesis];
+    loop {
+        let key = keys[keys.len() - 1];
+        let old = hex::encode(key);
+        let mut successors: Vec<(&String, u64)> = rotations
+            .iter()
+            .filter(|r| r.submitter_key_hash == key && r.key_hash_old == old)
+            .map(|r| (&r.key_hash_new, r.rot_ordinal))
+            .collect();
+        successors.sort();
+        successors.dedup();
+        let [(new, _)] = successors[..] else {
+            return keys;
+        };
+        let new = hex::decode(new)
+            .ok()
+            .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok());
+        match new {
+            Some(new) if !keys.contains(&new) => keys.push(new),
+            _ => return keys,
+        }
+    }
 }
 
 /// Verify one enumerated leaf's inclusion under the AUTHENTICATED `C_audit` root.

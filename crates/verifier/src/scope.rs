@@ -84,9 +84,62 @@ pub const SCOPE_ANCHOR: &str = "CONSISTENCIA (offline) confirms only that the \
     leaves is VACUOUS — it asserts nothing about anchoring; read the 'anchored \
     leaves checked' count. Surfaced anomalous rotations (e.g. unauthorized) do \
     NOT lower CONSISTENCIA — their fatal mapping is enumeration-dependent \
-    (COMPLETITUD); investigate them separately. The witness policy and \
-    genesis key used here are PINNED inputs from your auditor kit, never from \
-    the package.";
+    (COMPLETITUD); investigate them separately. With a v2 kit the submitter \
+    signature of every anchored leaf and of every followed rotation is checked \
+    against the public keys of the kit, and a leaf of a monitor bundle that is in \
+    the log under a key of the kit without its signature does not count for \
+    COMPLETITUD: the run says how many were discarded. A leaf of a bundle that is \
+    not in the log, or does not serialize, is not discarded: COMPLETITUD is FAILED. \
+    A leaf of a bundle under any other key stays, unchecked, and every key the \
+    rotations of the bundle reach must be in the kit, as those of the package: \
+    otherwise the run exits 2, ahead of a COMPLETITUD FAILED; a CONSISTENCIA FAILED, whatever its cause, exits 1 without looking at that gap. The check is strict: \
+    a signature a log accepts and strict verification does not is rejected in the \
+    package and discarded in a bundle, and only the holder of the key can make one. \
+    With a v1 kit no signature is checked, of the package or \
+    of the bundle: the run says NOT CHECKED, only the key hash binds a leaf to \
+    the producer, so the operator of the log is part of what you trust, and a \
+    made-up leaf in a bundle can accuse and can absolve in COMPLETITUD. The \
+    operator of the log \
+    can withhold or delay leaves, and a stolen key signs validly. The witness \
+    policy and genesis key used here are PINNED inputs from your auditor kit, \
+    never from the package.";
+
+/// The scope block `verify-record` prints after every run that reached a
+/// result. A `seetrex.record.v1` file carries more than the chain does, so the
+/// block says which of those parts this command did not touch. Like
+/// [`SCOPE_ANCHOR`], it belongs to one surface and is not shared.
+pub const SCOPE_RECORD: &str = "A confirmed anchor proves that the row existed \
+    when the log's checkpoint was cosigned. It does NOT prove completeness: \
+    nobody outside the vendor can see that a repository was left out of a batch. \
+    It does NOT detect truncation from the end either: a chain cut back to the \
+    proved row or later keeps every link, reports the shorter count and exits \
+    the same; only a copy you kept earlier shows the difference. The rows after \
+    the proved one are linked to it and not anchored yet. NOT covered by this \
+    check: `results`, \
+    `generated_at` and the repository name as told are not bound to anything; the \
+    slug is bound only when an anchor is confirmed, inside the leaf. The \
+    verdict_outcome, ruleset_id, appended_at and verdict_id of a chain row are \
+    inputs to no hash this command recomputes, so they can be changed with the \
+    same exit code and the same head; the human-readable columns keep the limits \
+    `verify-chain` states for them. NOT YET ANCHORED is not a promise that a \
+    proof will follow, and it is not evidence that none existed: setting `anchor` \
+    to null gives exit 4 to a record whose proof was removed, also when that proof \
+    would have failed with exit 1. The rotations are material chosen by whoever \
+    presents the record, and this command has no monitor: a fork that was left out \
+    of them is not detected, and a rotation does not revoke the old key, whose \
+    leaves keep passing. An anomalous rotation is one that was presented and not \
+    followed, unauthorized or off the chain from the pinned genesis: the run says \
+    so and it does not change the exit code; having none on screen says nothing \
+    about the log. The submitter signature of the anchored leaf and of every \
+    followed rotation is checked against the public keys of your kit, so a leaf the \
+    producer did not sign does not pass. That of an anomalous rotation is not \
+    checked, even when your kit holds the key that submitted it, because it was \
+    not followed. A stolen key signs validly. The witnesses cosign \
+    the consistency of the log, not the validity of its leaves, and the operator \
+    of the log can withhold or delay leaves, so it stays part of what you trust \
+    here. The batch size of \
+    the proof is not bound when another size gives the tree the same shape; it has \
+    no effect on the leaf proved.";
 
 #[cfg(test)]
 mod tests {

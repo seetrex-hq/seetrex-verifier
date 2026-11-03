@@ -38,9 +38,13 @@
 # one before that, 2026-08-29 against the published 0.3.5, recorded them too:
 # no subcommand is added, dropped or re-coded across the three, and no `--help`
 # exit code has moved since this record was written.
+# Exception to the above: the `verify-record` row is younger than all of those
+# observations. It is measured in this tree only, the tree 0.3.8 is cut from;
+# re-observation against the published 0.3.8 is owed (release runbook, section 7).
 --help	0
 verify-anchor	2
 verify-chain	1
 verify-package	2
+verify-record	2
 emit-sbom	2
 verify-sbom	2

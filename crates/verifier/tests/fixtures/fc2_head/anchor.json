@@ -1,0 +1,62 @@
+{
+  "version": "seetrex/anchor/v1",
+  "tenant_slug": "fc2-head-tenant",
+  "rows": [
+    {
+      "ordinal": 1,
+      "verdict_id": "00000000-0000-0000-0000-000000000000",
+      "verdict_hash": "01e6e490651adaf36abf0f1991bc576f4d9b8c50030d030f60c106f23baee247",
+      "chain_prev_hash": null,
+      "chain_hash": "93263f71d3ff2b4a724439cd262722881d9928555232c62874c69140d71ed8b2",
+      "appended_at": "2026-07-23T00:00:00Z",
+      "ruleset_id": "fc2-fixture",
+      "verdict_outcome": "SATISFIED"
+    }
+  ],
+  "checkpoint": {
+    "size": 196830,
+    "root": "5f37d9f47d9ab07ad151de58dd51ec192f85598128a28e34d3570757de7384ec",
+    "log_signature": "93d3747cfcb8450fcc4b4d1468ecd76e59645a2a1bfcd77fdb4f111b60bc505f9b32bc36b264a2ecf48f3dda27136bd0b849294c0331471105f77131ba88ca09",
+    "cosignatures": [
+      {
+        "key_hash": "1c997261f16e6e81d13f420900a2542a4b6a049c2d996324ee5d82a90ca3360c",
+        "timestamp": 1784815728,
+        "signature": "092401a54bbdf32ea42dd23c02338f3387851b1b676b7b0e5855432ee8bb5a797ba11bd57a2c63c96f54d3a56329aaa557b9ebddd3f908140625df7489290004"
+      },
+      {
+        "key_hash": "70b861a010f25030de6ff6a5267e0b951e70c04b20ba4a3ce41e7fba7b9b7dfc",
+        "timestamp": 1784815728,
+        "signature": "93d293a51d1cd286bcb22d549b35c9481191c91e57677bfd1d83c310df137d2ab43f30d53e7304a52f2dd37064405f65de02e21da9a620596a9eb0e44af19a0e"
+      },
+      {
+        "key_hash": "42351ad474b29c04187fd0c8c7670656386f323f02e9a4ef0a0055ec061ecac8",
+        "timestamp": 1784815728,
+        "signature": "bd471dc835a9c35f43a8f579dc813252a8c853232fd8e04d0f606447a7607cbe32edc9a90a20fd89a369e3788990f3a405404b36dcc8f6e93b6e495d312a4c0d"
+      }
+    ]
+  },
+  "anchored_leaves": [
+    {
+      "lane": {
+        "kind": "head",
+        "slug": "fc2-head-tenant",
+        "ordinal": 1,
+        "chain_hash": "93263f71d3ff2b4a724439cd262722881d9928555232c62874c69140d71ed8b2"
+      },
+      "submitter_signature": "336cd348dd8e5ac7fbcfa10ea6258c3fbacf1ea94aa3bfb23844327db88113b1b654274ab76fc8af569d8c5f35d20ea8ad8ea095d63168a62e462618b035bf0c",
+      "submitter_key_hash": "3ec01c5d15f5624fa554aa103934056103f3860237582396fcd327403bfdb86d",
+      "index": 196829,
+      "inclusion_proof": [
+        "4f30569b08cedbab25bcd7d6f297145200bac34b8856d146a6b4c4fa1c65fbf0",
+        "1f9c0067ae59a2b51bee2fa99ac5a3cf7ad58973d5806239d0815d59d370253a",
+        "a39c5385ae4008712b87ae3a4b4175a05b93cf21d3b42beee1472ec2095d7391",
+        "6bfaa881b0adfb6b4c2789fb5382f238b3616b5bcb365fda2fb78de04322356a",
+        "796bc23d12a5244a0f09f2efd6be94c2ecfc094e23d89787a6cd4cfc1b1bbe05",
+        "bcfdac2599bd8ddfe4908ff4c27b4c02a7a7916df9e22a5b1c3b6d02207251dc",
+        "2387f1500f0756070e7a9c67f417f6036effa82f96c2fbc782cb869c7e144d85",
+        "43bd28c79dec46786a85bdf0fe72eac3985a8fa172979cdbf7dc04d6c506d43d"
+      ]
+    }
+  ],
+  "rotations": []
+}

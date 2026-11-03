@@ -403,16 +403,23 @@ zero are different claims, and only one of them is checkable.
    rather than in a property of this vendor's own, so that any CycloneDX consumer reads
    it without knowing the `seetrex:` prefix -- and so that it will survive this
    product's own ingest once that whitelist is widened, which is a pinned-ruleset change
-   with its own gate and not an edit to this document. It does not survive it **today**:
-   the normaliser keeps four keys (`bomFormat`, `specVersion`, `metadata.component`,
-   `components`) and `dependencies` is not among them, so the top-level set reaches no
-   content hash of the chain either, exactly like the properties of this section. What
-   reaches the auditor today is the canonical FILE, whose `sha256` is its canonical hash
-   and which `verify-sbom` confronts with the lockfile (Section 7) OUTSIDE the chain.
+   with its own gate and not an edit to this document. The published `dependencies`
+   array does not survive it **today**: the normaliser keeps five keys (`bomFormat`,
+   `specVersion`, `metadata.component`, `components`, `top_level_dependencies`) and
+   `dependencies` is not among them, so the top-level set reaches no content hash of the
+   chain in that form -- as refs into a per-run `bom-ref` space -- exactly like the
+   properties of this section. What the normaliser does carry into the hash is
+   `top_level_dependencies`: the subject's top-level dependencies RESOLVED to stable
+   identities -- the purl of each direct dependency, or `cdx:sha256:` over the
+   normalised component when it has no purl -- present only when the ingested document
+   declares a graph for its subject (F1, 2026-09-04). What reaches the auditor today is
+   the canonical FILE, whose `sha256` is its canonical hash and which `verify-sbom`
+   confronts with the lockfile (Section 7) OUTSIDE the chain.
 2. **They reach no content hash today.** This product's ingest normaliser discards
-   BOM-level keys other than `bomFormat`, `specVersion`, `metadata.component` and
-   `components`, and `properties` is not a substantive component field either. They
-   exist as bytes of the published file and as self-description for a reader.
+   BOM-level keys other than `bomFormat`, `specVersion`, `metadata.component`,
+   `components` and the resolved `top_level_dependencies`, and `properties` is not a
+   substantive component field either. They exist as bytes of the published file and as
+   self-description for a reader.
 3. **The `seetrex` prefix is de facto, not registered** in the CycloneDX property
    taxonomy. Registration is a public act carrying a stability obligation and is out of
    scope here; claiming it before it happened would be false.
@@ -776,7 +783,7 @@ is a falsifiable claim, not an aspiration.
    constant. The mechanism is a RE-DERIVATION, not a recorded manual run: the pins are
    computed on the developer's machine (Windows) and re-derived against the same
    committed constants by the continuous integration on Linux
-   (`.forgejo/workflows/security.yml`, job `cargo-test`, step `cargo test (workspace,
+   (`.github/workflows/security.yml`, job `cargo-test`, step `cargo test (workspace,
    lib + integration)`). An implementation whose pins have never been re-derived on a
    second platform MUST NOT claim platform independence.
 6. **Real-lockfile invariants.** Over the project's actual lockfiles: the projection

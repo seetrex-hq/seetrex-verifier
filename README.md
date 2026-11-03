@@ -27,9 +27,9 @@ Verification splits into two legs:
    external anchor — with no vendor involvement at all.
 2. **Outcome re-derivation — engine execution required.** Recomputing the
    verdict *outcome* from the derived facts re-runs the inference engine,
-   which is not open source. It is available as a signed, reproducibly
-   built binary (black box), or as a source rebuild under NDA for
-   regulators.
+   which is not open source. It is available on request as a signed,
+   reproducibly built binary (black box), or as a source rebuild under
+   NDA for regulators.
 
 Leg 1 needs nothing from the vendor. Leg 2 is stated here explicitly so the
 guarantee is never oversold: this repository proves integrity of the
@@ -50,17 +50,18 @@ cargo test --locked
 ## Getting the verification tool
 
 `seetrex-verifier` has shipped an installable command-line binary of the
-same name since 0.3.0. Install the current version, `0.3.7`: the `0.3.0`
+same name since 0.3.0. Install the current version, `0.3.8`: the `0.3.0`
 and `0.3.1` binaries printed a `verify-chain` trailer that overstated the
 scope of that check, and must not be used as the executable.
 
 ```bash
-cargo install seetrex-verifier --locked --version 0.3.7
+cargo install seetrex-verifier --locked --version 0.3.8
 
 seetrex-verifier verify-package <dir> [--expected-verdict-hash <hex>]
 seetrex-verifier verify-chain <chain-export.json>
 seetrex-verifier verify-anchor <anchor.json> --kit <kit.json>
                                [--monitor <bundle.json>] [--chain <chain.json>]
+seetrex-verifier verify-record <record.json> [--kit <kit.json>]
 seetrex-verifier emit-sbom --kind <cargo|composer|npm> --lockfile <path>
                            [--manifest <composer.json>] --subject <purl>
                            --out <path>

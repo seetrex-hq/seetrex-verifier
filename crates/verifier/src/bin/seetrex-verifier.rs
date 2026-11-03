@@ -50,6 +50,15 @@
 //!   surface is not §9.6-blessed and a confirmed CONSISTENCIA with
 //!   INCONCLUSIVE COMPLETITUD is not a blanket strong pass. CONSISTENCIA
 //!   confirmed: exit 0. Failed / bad package: exit 1. Bad kit: exit 2.
+//! - `verify-record <record.json> [--kit <kit.json>]` -- OFFLINE verification
+//!   of a `seetrex.record.v1` file: the chain it carries, whole, and then the
+//!   walk from its last proved row through the batch chain `oss-batches` to a
+//!   leaf of the cosigned log, against the PINNED kit (tenant `oss-batches`).
+//!   Like `verify-anchor` it does NOT emit the reserved `VERIFIED` token: a
+//!   confirmed anchor proves existence, not completeness. Anchor confirmed:
+//!   exit 0. `anchor: null`: `ANCHOR: NOT YET ANCHORED`, exit 4, the code
+//!   `verify-package` gives a pass nothing outside the file attested. Failed
+//!   or malformed record: exit 1. A proof with no `--kit`, or a bad kit: exit 2.
 //! - `emit-sbom --kind <cargo|composer|npm> --lockfile <path>
 //!   [--manifest <composer.json>] --subject <purl> --out <path>` -- writes
 //!   the canonical SBOM projection of a lockfile (spec:
@@ -88,7 +97,7 @@ use serde_json::{Map, Value};
 
 use seetrex_verifier::anchor::Verdict;
 use seetrex_verifier::anchor_package::{
-    parse_anchor_package, parse_auditor_kit, verify_anchored_package_with_chain, MonitorAudit,
+    parse_anchor_package, parse_auditor_kit, verify_anchored_package_with_kit, MonitorAudit,
 };
 use seetrex_verifier::anchor_completitud::TruncationReference;
 use seetrex_verifier::chain_export::parse_and_verify_package;
@@ -96,6 +105,7 @@ use seetrex_verifier::cli_render::{
     cap_refusal, chain_export_text, render_chain_read_failure, render_verify_chain,
     render_verify_package, CommandOutput, CHAIN_EXPORT_MAX_BYTES,
 };
+use seetrex_verifier::record::{verify_record, AnchorStatus, RecordError};
 use seetrex_verifier::package::{
     sanitize_reserved_token as redact, verify_package, RESERVED_TOKEN_LEGEND, RESERVED_TOKEN_MASK,
 };
@@ -120,6 +130,7 @@ USAGE:
     seetrex-verifier verify-chain <file.json>
     seetrex-verifier verify-anchor <anchor.json> --kit <kit.json> [--monitor <bundle.json>]
                                   [--chain <chain.json>]
+    seetrex-verifier verify-record <record.json> [--kit <kit.json>]
     seetrex-verifier emit-sbom --kind <cargo|composer|npm> --lockfile <path>
                                [--manifest <composer.json>] --subject <purl>
                                --out <path>
@@ -154,7 +165,14 @@ COMMANDS:
                       NOT cryptographically proven offline — every leaf's
                       inclusion and the checkpoint cosignature ARE). CONSISTENCIA confirmed:
                       exit 0. CONSISTENCIA failed / bad package: exit 1.
-                      Bad or missing kit: exit 2. --chain <chain.json>
+                      Bad or missing kit: exit 2. A seetrex/anchor-kit/v2 kit
+                      also has the submitter signatures checked: an invalid
+                      one is exit 1, a derived key it lacks exit 2, which
+                      prevails over a COMPLETITUD FAILED: that FAILED is
+                      then printed on stderr. A monitor leaf in the log under
+                      a key of the kit without its signature is discarded,
+                      and the run counts them. A v1 kit prints NOT CHECKED, for the
+                      package and for the monitor. --chain <chain.json>
                       is the producer's CURRENT published chain export,
                       the input that DECIDES COMPLETITUD's truncation rule:
                       a package is a SNAPSHOT and legitimately LAGS the log,
@@ -169,6 +187,19 @@ COMMANDS:
                       rotations and completeness (omitted leaves) are
                       enumeration-dependent; do not gate
                       automation on exit 0 alone.
+    verify-record     Offline verification of a seetrex.record.v1 file: the
+                      chain it carries, whole, and then the walk from its last
+                      proved row through the batch chain oss-batches to a leaf
+                      of the cosigned log, against your PINNED kit (--kit
+                      <kit.json>, whose tenant must be oss-batches). Exit 0:
+                      anchor confirmed, which proves existence and NOT
+                      completeness; read how many rows are not anchored yet.
+                      Exit 4: the chain holds and the record has no anchor yet,
+                      so nothing outside the file attests it. Exit 1: failed or
+                      malformed record. Exit 2: a proof and no --kit, a v1 kit
+                      (a proof needs seetrex/anchor-kit/v2, which checks the
+                      submitter signatures), a derived key the kit lacks, or a
+                      bad kit.
     emit-sbom         Write the canonical SBOM projection of a lockfile
                       (spec SPEC_SBOM_CANONICAL_V1.md) to --out and print
                       its SHA-256 on stdout, and nothing else on stdout, so
@@ -250,6 +281,7 @@ fn run() -> ExitCode {
         Some("verify-package") => cmd_verify_package(&args[1..]),
         Some("verify-chain") => cmd_verify_chain(&args[1..]),
         Some("verify-anchor") => cmd_verify_anchor(&args[1..]),
+        Some("verify-record") => cmd_verify_record(&args[1..]),
         Some("emit-sbom") => cmd_emit_sbom(&args[1..]),
         Some("verify-sbom") => cmd_verify_sbom(&args[1..]),
         Some(other) => {
@@ -354,6 +386,184 @@ fn cmd_verify_chain(rest: &[String]) -> ExitCode {
     emit(render_verify_chain(parse_and_verify_package(&raw)))
 }
 
+/// The longest error line `verify-record` prints for a record, prefix and note of
+/// the cut included: a reason quotes what the file said, and the file may be as
+/// long as [`CHAIN_FILE_MAX_BYTES`].
+const ERROR_LINE_MAX_BYTES: usize = 1024;
+
+/// The room kept for the note of the cut: two `u64` would not fit, one and a
+/// three-digit number do.
+const ERROR_LINE_NOTE_BYTES: usize = 48;
+
+/// `prefix` and `reason`, in at most [`ERROR_LINE_MAX_BYTES`], cut on a character
+/// boundary and saying so. The sanitizer runs first because it can lengthen the
+/// text: run after the cut, it would take the line past the bound.
+fn bounded_line(prefix: &str, reason: &str) -> String {
+    let mut line = format!("{prefix}{}", sanitize_reserved_token(reason));
+    let total = line.len();
+    if total <= ERROR_LINE_MAX_BYTES {
+        return line;
+    }
+    let mut end = ERROR_LINE_MAX_BYTES - ERROR_LINE_NOTE_BYTES;
+    while !line.is_char_boundary(end) {
+        end -= 1;
+    }
+    line.truncate(end);
+    format!("{line}... (first {end} of {total} bytes)")
+}
+
+/// A string from argv, ready for the terminal: a script may have taken it from the
+/// file's publisher, so it is quoted and escaped like the strings of the file.
+fn escaped(text: &str) -> String {
+    sanitize_reserved_token(&format!("{text:?}"))
+}
+
+/// `verify-record <record.json> [--kit <kit.json>]` -- thin shell over
+/// `record::verify_record`. The record is UNTRUSTED vendor material, the kit is
+/// the auditor's own; the exit codes split them as `verify-anchor` does.
+///
+/// What of the file reaches the terminal: the slug, which passed `is_valid_slug`;
+/// the repository name, as `record::repository_for_display` left it, which is
+/// `<hex:...>` unless it has the shape and the charset of a name, and at most 256
+/// bytes of it either way; and the reasons of `RecordError`, which carry the text of
+/// the file under the same rule, `<hex:...>` unless it is one plain word (the
+/// parser's own message included, which quotes refused keys byte for byte), in a
+/// line of at most [`ERROR_LINE_MAX_BYTES`]. Paths from argv are escaped by
+/// [`escaped`]. All of it goes through the sanitizer. The head and the numbers are
+/// recomputed or validated values, and the other lines are fixed text with no
+/// reserved token.
+fn cmd_verify_record(rest: &[String]) -> ExitCode {
+    let mut record_file: Option<&str> = None;
+    let mut kit_file: Option<String> = None;
+    let mut it = rest.iter();
+    while let Some(arg) = it.next() {
+        let taken = match arg.as_str() {
+            "--kit" => take_flag_value(&mut it, "--kit", &mut kit_file),
+            // A leading dash is a flag, `-h` included: `./-x` reaches such a file.
+            other if record_file.is_none() && !other.starts_with('-') => {
+                record_file = Some(other);
+                Ok(())
+            }
+            other => {
+                eprintln!(
+                    "error: unexpected argument {} for verify-record",
+                    escaped(other)
+                );
+                return ExitCode::from(2);
+            }
+        };
+        if let Err(code) = taken {
+            return code;
+        }
+    }
+    let Some(record_file) = record_file else {
+        eprintln!("error: verify-record requires a <record.json> operand");
+        return ExitCode::from(2);
+    };
+
+    let kit = match kit_file {
+        None => None,
+        Some(kf) => {
+            let raw = match read_capped_utf8(Path::new(kf.as_str())) {
+                Ok(raw) => raw,
+                Err(detail) => {
+                    eprintln!(
+                        "error: cannot read kit {}: {}",
+                        escaped(&kf),
+                        sanitize_reserved_token(&detail)
+                    );
+                    return ExitCode::from(2);
+                }
+            };
+            match parse_auditor_kit(&raw) {
+                Ok(kit) => Some(kit),
+                Err(e) => {
+                    eprintln!(
+                        "error: invalid auditor kit: {}",
+                        sanitize_reserved_token(&format!("{e:?}"))
+                    );
+                    return ExitCode::from(2);
+                }
+            }
+        }
+    };
+
+    let raw = match read_capped_utf8(Path::new(record_file)) {
+        Ok(raw) => raw,
+        Err(detail) => {
+            eprintln!(
+                "ERROR: cannot read {}: {}",
+                escaped(record_file),
+                sanitize_reserved_token(&detail)
+            );
+            return ExitCode::from(1);
+        }
+    };
+
+    let report = match verify_record(&raw, kit.as_ref()) {
+        Ok(report) => report,
+        Err(
+            e @ (RecordError::KitRequired
+            | RecordError::KitNotForBatches { .. }
+            | RecordError::KitLacksIdentityKeys
+            | RecordError::KitMissingIdentityKey { .. }),
+        ) => {
+            eprintln!("{}", bounded_line("error: ", &e.to_string()));
+            return ExitCode::from(2);
+        }
+        Err(e) => {
+            eprintln!("{}", bounded_line("ERROR: record: ", &e.to_string()));
+            return ExitCode::from(1);
+        }
+    };
+
+    println!("Record chain links recomputed OFFLINE");
+    println!(
+        "  slug:                    {}",
+        sanitize_reserved_token(&format!("{:?}", report.slug))
+    );
+    println!(
+        "  repository as told:      {} (not signed and not chained)",
+        sanitize_reserved_token(&report.repository_as_told)
+    );
+    println!("  verdict_count:           {}", report.head.verdict_count);
+    println!("  last_chain_hash:         {}", report.head.last_chain_hash);
+    let code = match report.anchor {
+        AnchorStatus::NotYetAnchored => {
+            println!(
+                "ANCHOR: NOT YET ANCHORED: nothing outside this file attests the chain, and \
+                 the slug above is bound to nothing. This says what the file lacks, not \
+                 that a proof will follow."
+            );
+            ExitCode::from(4)
+        }
+        AnchorStatus::Confirmed {
+            proved_ordinal,
+            member_batch_ordinal,
+            anchored_batch_ordinal,
+            log_leaf_index,
+            checkpoint_size,
+            anomalous_rotations,
+        } => {
+            let count = report.head.verdict_count;
+            println!("ANCHOR: CONFIRMED OFFLINE through ordinal {proved_ordinal} of {count}");
+            println!("  rows not yet anchored:   {}", u64::from(count) - proved_ordinal);
+            println!("  batch rows walked:       {member_batch_ordinal}..={anchored_batch_ordinal}");
+            println!("  log leaf index:          {log_leaf_index}");
+            println!("  checkpoint size:         {checkpoint_size}");
+            if anomalous_rotations > 0 {
+                println!(
+                    "  anomalous rotations:     {anomalous_rotations} surfaced (unaccounted - investigate)"
+                );
+            }
+            ExitCode::SUCCESS
+        }
+    };
+    println!();
+    println!("{}", sanitize_reserved_token(seetrex_verifier::scope::SCOPE_RECORD));
+    code
+}
+
 /// `verify-anchor <anchor.json> --kit <kit.json>` — thin shell over
 /// `verify_anchored_package`. The positional `anchor.json` is the UNTRUSTED,
 /// producer-published package (public evidence: chain rows, anchored leaves +
@@ -385,7 +595,9 @@ fn cmd_verify_chain(rest: &[String]) -> ExitCode {
 /// invocation behaves exactly as before.
 ///
 /// Exit codes: CONSISTENCIA confirmed → 0; CONSISTENCIA failed / unreadable /
-/// malformed PACKAGE → 1; usage error OR a malformed/unreadable KIT → 2. A bad
+/// malformed PACKAGE → 1; usage error, a malformed/unreadable KIT, OR a derived key
+/// the kit has no public key for → 2, the last one ahead of a COMPLETITUD FAILED,
+/// which then goes to stderr with the rest of the run. A bad
 /// kit is the AUDITOR's own config error, kept distinct from exit 1 so a script
 /// gating on "the vendor's package failed" is not polluted by a typo in the
 /// auditor's kit file. The `--chain` export is VENDOR material like the package
@@ -553,20 +765,49 @@ fn cmd_verify_anchor(rest: &[String]) -> ExitCode {
     // without one it can decide nothing. Surfaced rather than silently dropped.
     let chain_supplied_but_unused = chain_rows.is_some() && monitor.is_none();
 
-    let report = verify_anchored_package_with_chain(
-        &kit.tenant_slug,
-        kit.genesis_key_hash,
-        &kit.policy,
-        &pkg,
-        monitor.as_ref(),
-        chain_rows.as_deref(),
-    );
+    let outcome =
+        verify_anchored_package_with_kit(&kit, &pkg, monitor.as_ref(), chain_rows.as_deref());
+    let report = outcome.report;
+    // What became of the leaves of the bundle, on every terminal arm: they can decide
+    // COMPLETITUD, which every arm prints. Only when the rules ran: a run refused above
+    // them read no leaf for them, and the line would speak of a filter that did nothing.
+    let monitor_line = report
+        .truncation_reference
+        .is_some()
+        .then(|| monitor_leaves_line(outcome.monitor_leaves_discarded));
+    let (keys, anomalies) = match &report.identity {
+        Some(set) => (set.keys.len(), set.anomalous_rotations.len()),
+        None => (0, 0),
+    };
+    // The auditor's own input, like a bad kit: exit 2 ahead of any verdict, since no
+    // verdict was reached, and ahead of a COMPLETITUD FAILED, which is printed here
+    // with the rest of what the run found. Nothing here is text of the package.
+    if let Some(key_hash) = outcome.kit_gap {
+        eprintln!(
+            "error: the rotations of the package or of the monitor bundle derive the identity \
+             key {} and the kit pins no public key for it: add it to identity_pubkeys, from a \
+             source you trust",
+            hex::encode(key_hash)
+        );
+        if anomalies > 0 {
+            eprintln!("anomalous rotations: {anomalies} surfaced (unaccounted — investigate)");
+        }
+        if let Some(line) = &monitor_line {
+            eprintln!("monitor leaves: {line}");
+        }
+        eprintln!("COMPLETITUD: {}", completitud_display(&report.completitud));
+        eprintln!(
+            "truncation reference: {}",
+            truncation_reference_line(
+                report.truncation_reference.as_ref(),
+                chain_supplied_but_unused,
+            )
+        );
+        eprintln!("{}", seetrex_verifier::scope::SCOPE_ANCHOR);
+        return ExitCode::from(2);
+    }
     match report.consistencia {
         Verdict::Verified => {
-            let (keys, anomalies) = match &report.identity {
-                Some(set) => (set.keys.len(), set.anomalous_rotations.len()),
-                None => (0, 0),
-            };
             // FIXED banner — no reserved token by construction.
             println!("Anchor package CONSISTENCIA CONFIRMED OFFLINE");
             // Debug-print the (trusted) tenant so a stray control byte in the
@@ -578,6 +819,20 @@ fn cmd_verify_anchor(rest: &[String]) -> ExitCode {
             println!("  anchored leaves checked: {}", pkg.anchored_leaves.len());
             println!("  rotations checked:       {}", pkg.rotations.len());
             println!("  identity keys:           {keys} (genesis + accepted rotations)");
+            // Same volume as the verdict: a v1 kit gives the same banner and the same
+            // exit code with no signature read.
+            match outcome.signatures_checked {
+                Some(checked) => {
+                    println!("  submitter signatures:    {checked} checked against the keys of the kit");
+                }
+                None => println!(
+                    "  submitter signatures:    NOT CHECKED: this kit pins no public key \
+                     (use a seetrex/anchor-kit/v2 kit)"
+                ),
+            }
+            if let Some(line) = &monitor_line {
+                println!("  monitor leaves:          {line}");
+            }
             // WHICH row count COMPLETITUD's truncation rule judged against. Silence
             // here would leave "INCONCLUSIVE" and "FAILED" reading the same whether
             // the deciding input was present or absent.
@@ -625,6 +880,9 @@ fn cmd_verify_anchor(rest: &[String]) -> ExitCode {
             // row-JOIN, so this can be Failed/Verified here — show the TRUE
             // verdict, never a hardcoded "INCONCLUSIVE" label. CONSISTENCIA
             // still drives the exit code (1).
+            if let Some(line) = &monitor_line {
+                eprintln!("monitor leaves: {line}");
+            }
             eprintln!("COMPLETITUD: {}", completitud_display(&report.completitud));
             eprintln!(
                 "truncation reference: {}",
@@ -646,6 +904,9 @@ fn cmd_verify_anchor(rest: &[String]) -> ExitCode {
             // Print COMPLETITUD here too, so the two verdicts never collapse on
             // ANY terminal path (symmetry with the Verified/Failed arms). Show
             // its TRUE verdict — with a monitor it may be Failed/Verified.
+            if let Some(line) = &monitor_line {
+                eprintln!("monitor leaves: {line}");
+            }
             eprintln!("COMPLETITUD: {}", completitud_display(&report.completitud));
             eprintln!(
                 "truncation reference: {}",
@@ -657,6 +918,21 @@ fn cmd_verify_anchor(rest: &[String]) -> ExitCode {
             eprintln!("{}", seetrex_verifier::scope::SCOPE_ANCHOR);
             ExitCode::from(1)
         }
+    }
+}
+
+/// What became of the leaves of a monitor bundle. `None` is a v1 kit, which reads
+/// none of them; the same volume as the v2 count, since a made-up leaf can move
+/// COMPLETITUD either way there.
+fn monitor_leaves_line(discarded: Option<usize>) -> String {
+    match discarded {
+        Some(n) => format!(
+            "{n} discarded (in the log under a key of the kit, without its signature: not \
+             counted for COMPLETITUD)"
+        ),
+        None => "NOT CHECKED: this kit pins no public key, so a made-up leaf can accuse \
+                 and can absolve in COMPLETITUD (use a seetrex/anchor-kit/v2 kit)"
+            .to_string(),
     }
 }
 
@@ -1740,4 +2016,36 @@ fn read_capped_utf8_at(path: &Path, cap: u64) -> Result<String, String> {
 /// The chain-export read: [`read_capped_utf8_at`] at the export's own cap.
 fn read_capped_utf8(path: &Path) -> Result<String, String> {
     read_capped_utf8_at(path, CHAIN_FILE_MAX_BYTES)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The sanitizer lengthens the text, so it runs first; the bound covers the
+    /// prefix and the note of the cut; a reserved token cut in two is not left to
+    /// reassemble, because the mask is what gets cut.
+    #[test]
+    fn bounded_line_holds_the_whole_line_to_the_bound() {
+        let reason = "verified".repeat(1_000);
+        let line = bounded_line("ERROR: record: ", &reason);
+        assert!(line.len() <= ERROR_LINE_MAX_BYTES, "{} bytes", line.len());
+        assert!(line.starts_with("ERROR: record: "), "{line}");
+        assert!(line.contains("... (first "), "{line}");
+        assert!(!line.to_ascii_uppercase().contains("VERIFIED"), "{line}");
+        let total = "ERROR: record: ".len() + 15_000;
+        assert!(line.ends_with(&format!(" of {total} bytes)")), "{line}");
+    }
+
+    #[test]
+    fn bounded_line_leaves_a_line_within_the_bound_whole() {
+        let reason = "x".repeat(ERROR_LINE_MAX_BYTES - 7);
+        assert_eq!(bounded_line("error: ", &reason), format!("error: {reason}"));
+    }
+
+    #[test]
+    fn bounded_line_cuts_on_a_character_boundary() {
+        let line = bounded_line("", &"\u{20ac}".repeat(1_000));
+        assert!(line.len() <= ERROR_LINE_MAX_BYTES, "{} bytes", line.len());
+    }
 }

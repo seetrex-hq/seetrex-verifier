@@ -266,7 +266,7 @@ fn rust_sources(dir: &Path, found: &mut Vec<PathBuf>) {
 ///   `SEETREX_PRIVATE_TREE` gate of `src/sbom/private_tree.rs`, which skips
 ///   out loud when the private repository is not there.
 /// CONTEXT: T8 landed real-lockfile tests that climbed two levels out of
-///   `CARGO_MANIFEST_DIR` to read `portal/`, `frontend/` and the workspace
+///   `CARGO_MANIFEST_DIR` to read `portal/` and the workspace
 ///   `Cargo.lock`. None of those paths is on the export allowlist, so phase 4
 ///   of `scripts/export_public.sh` -- `cargo test --locked` in the isolated
 ///   staging tree -- panicked in a dozen tests and the export was

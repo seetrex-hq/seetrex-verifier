@@ -21,12 +21,12 @@ consumes this crate and adds the inference engine on top):
 ## Command-line tool
 
 The crate has shipped an installable binary of the same name since 0.3.0
-(0.2.0 was library-only). Install the current version, `0.3.7`: the `0.3.0`
+(0.2.0 was library-only). Install the current version, `0.3.8`: the `0.3.0`
 and `0.3.1` binaries printed a `verify-chain` trailer that overstated the
 scope of that check, and must not be used as the executable.
 
 ```console
-cargo install seetrex-verifier --locked --version 0.3.7
+cargo install seetrex-verifier --locked --version 0.3.8
 
 seetrex-verifier verify-package <dir> [--expected-verdict-hash <hex>]
 seetrex-verifier verify-chain <chain-export.json>
@@ -40,7 +40,7 @@ seetrex-verifier verify-sbom --kind <cargo|composer|npm> --lockfile <path>
                              --sbom <path> [--third-party] [--dep-v0 <elf>]
 ```
 
-That is the whole list the binary offers; `seetrex-verifier --help` prints it.
+`verify-record` is new in 0.3.8, see Records below.
 `verify-anchor` is new in 0.3.3 and its `--chain` input in 0.3.4; the two SBOM
 subcommands are new in 0.3.4.
 
@@ -60,7 +60,7 @@ published tenant page. Exit 0 on success, 1 on any failure.
 
 `verify-anchor` checks a producer-published anchor package OFFLINE against a
 transparency log's cosigned checkpoint, under the policy pinned in the auditor
-`kit.json`. With `--monitor` it also confronts the package with an independent
+`kit.json`. From 0.3.8, a `seetrex/anchor-kit/v2` kit also pins the public keys of the identity: the submitter signatures of the anchored leaves and followed rotations are checked (an invalid one is exit 1; a key derived from the rotations of the package or of a monitor bundle that the kit lacks is exit 2, which prevails over a COMPLETITUD FAILED), and a monitor leaf in the log under a key of the kit without its signature is discarded and counted; one that does not include or serialize is FAILED, as under a v1 kit. A v1 kit prints NOT CHECKED, and 0.3.7 refuses a v2 kit, checks no signature and does not say so. With `--monitor` it also confronts the package with an independent
 enumeration of the log. `--chain` supplies the producer's published chain
 export as the reference the truncation rule judges against: without it, a head
 beyond the package's rows is reported INCONCLUSIVE and the exit code stays 0,
@@ -103,9 +103,9 @@ This boundary is deliberate, and it splits verification into two legs:
    preimage, the audit chain links and the external anchor.
 2. **Outcome re-derivation — engine execution required.** Recomputing the
    verdict *outcome* from the derived facts re-runs the inference engine,
-   which is not open source. It is available as a signed, reproducibly
-   built binary (black box), or as a source rebuild under NDA for
-   regulators.
+   which is not open source. It is available on request as a signed,
+   reproducibly built binary (black box), or as a source rebuild under
+   NDA for regulators.
 
 Leg 1 needs nothing from us. Leg 2 is stated here explicitly so that the
 guarantee is never oversold: this crate proves integrity of the record, not
@@ -123,3 +123,42 @@ There is deliberately NO per-crate `rust-toolchain.toml`.
 ## Spec
 
 The byte-level package format is specified in `docs/SPEC_VERDICT_PACKAGE_V1.md`.
+
+## Records
+
+```console
+seetrex-verifier verify-record <record.json> [--kit <kit.json>]
+```
+
+`verify-record` is new in 0.3.8, and 0.3.7 does not have it. It checks a `seetrex.record.v1` file offline: the whole chain
+it carries, then the walk from its last proved row through the batch chain
+`oss-batches` to a leaf of the cosigned log, under the policy of a `kit.json`
+whose tenant is `oss-batches`. Exit 0 means the anchor is confirmed; read how
+many rows are not anchored yet, and note that it proves existence, not
+completeness, and does not detect a chain cut back from the end. Exit 4 means
+the chain holds and the record has no anchor: neither a failure nor a pass, and
+not a promise that one will follow. Setting `anchor` to null gives exit 4 to any
+record whose chain holds, also to one that with its proof would exit 1; with the
+chain broken the exit is 1 all the same.
+
+Limits of the anchor it confirms: `rotations` is material chosen by whoever
+presents the record and there is no monitor, so a fork left out of it is not
+detected; a rotated key is not revoked; `anomalous rotations` does not change the
+exit code. A proof needs a `seetrex/anchor-kit/v2` kit, whose `identity_pubkeys`
+check the submitter signature of the leaf and of every followed rotation; a v1 kit
+with a proof, or a derived key the kit lacks, is exit 2. The witnesses cosign the
+consistency of the log, not the validity of its leaves, and the operator of the log
+can withhold or delay leaves, so it stays part of what you trust. A
+`repository_as_told` that is not a plain `owner/repo`
+of at most 256 bytes prints as `<hex:...>`.
+
+`verify-chain` does not read a record: the whole file is exit 1. It takes the
+`chain` member extracted into a file of its own (`jq .chain record.json`). Its
+comparison with the Trust Center does not apply to the chain of a private
+repository, which is published nowhere.
+
+In `oss-batches-chain.json`, `verdict_outcome` and `ruleset_id` are batch
+metadata the row format requires, not verdicts: no engine evaluated anything,
+and `verdict_hash` is a Merkle root with no package behind it. `verify-chain`
+passes over that file as over any other, `verify-package` does not apply, and
+the format's `schema_version` is unchanged.

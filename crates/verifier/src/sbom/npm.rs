@@ -866,21 +866,6 @@ mod tests {
                 "every top-level edge names a component of the document: {purl}"
             );
         }
-
-        // The frontend root declares both runtime and development
-        // requirements, and BOTH reach the set (the merge the basis token
-        // declares).
-        let Some(frontend_text) = real_lockfile("frontend") else {
-            return;
-        };
-        let frontend = project_lockfile(&frontend_text, subject())
-            .expect("the real frontend lockfile projects");
-        assert_eq!(
-            frontend.top_level().len(),
-            17,
-            "5 dependencies + 12 devDependencies; got {:?}",
-            frontend.top_level()
-        );
     }
 
     /// INTENT: the projection of a given lockfile is byte-identical
@@ -893,7 +878,7 @@ mod tests {
     ///   lockfile bytes.
     #[test]
     fn test_intent_npm_projection_is_byte_reproducible() {
-        for project_dir in ["portal", "frontend"] {
+        for project_dir in ["portal"] {
             let Some(raw) = real_lockfile(project_dir) else {
                 return;
             };
@@ -1039,7 +1024,7 @@ mod tests {
             projection.components().iter().all(|c| c.hash.is_none()),
             "an npm component carries no digest"
         );
-        for project_dir in ["portal", "frontend"] {
+        for project_dir in ["portal"] {
             let Some(raw) = real_lockfile(project_dir) else {
                 return;
             };
@@ -1533,22 +1518,6 @@ mod tests {
         };
         assert_eq!(scope_of("pkg:npm/outer-lib@3.0.0"), Some("required"));
         assert_eq!(scope_of("pkg:npm/dev-only-lib@0.9.0"), Some("optional"));
-
-        // The real portal tree is development-only, so every component of
-        // it is optional -- and the frontend tree has both.
-        let Some(frontend_text) = real_lockfile("frontend") else {
-            return;
-        };
-        let frontend = project_lockfile(&frontend_text, subject())
-            .expect("the real frontend lockfile projects");
-        assert!(frontend
-            .components()
-            .iter()
-            .any(|c| c.scope == Some("optional")));
-        assert!(frontend
-            .components()
-            .iter()
-            .any(|c| c.scope == Some("required")));
     }
 
     /// Shapes outside what the parser reads abort the parse instead of

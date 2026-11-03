@@ -8,8 +8,8 @@
 //! handles the shapes somebody thought of, a real lockfile proves it handles
 //! the shapes that actually occur. Those lockfiles are not part of the
 //! published source tree, so a test that climbs out of the crate to reach
-//! them -- two levels up from `CARGO_MANIFEST_DIR`, into `portal/` or
-//! `frontend/` -- makes the PUBLISHED crate un-testable: `cargo test` in an
+//! them -- two levels up from `CARGO_MANIFEST_DIR`, into `portal/`
+//! -- makes the PUBLISHED crate un-testable: `cargo test` in an
 //! exported checkout panics on a file that was never exported.
 //!
 //! `tests/intent_public_crate_is_self_contained.rs` is the guard that keeps
@@ -41,12 +41,11 @@ use std::path::{Path, PathBuf};
 const PRIVATE_TREE_VAR: &str = "SEETREX_PRIVATE_TREE";
 
 /// The lockfiles the private-tree tests project. A directory that does not
-/// carry all four is not the tree these tests mean, whatever its name.
-const REQUIRED_LOCKFILES: [&str; 4] = [
+/// carry all three is not the tree these tests mean, whatever its name.
+const REQUIRED_LOCKFILES: [&str; 3] = [
     "Cargo.lock",
     "portal/composer.lock",
     "portal/package-lock.json",
-    "frontend/package-lock.json",
 ];
 
 /// The private repository root, or `None` when this run is not in it.

@@ -1020,6 +1020,17 @@ The package's `manifest.json` copies `chain_prev_hash` and `chain_hash` for
 correlation, but — see §9.4 — matching them proves nothing about the
 verdict's position in the *current* chain.
 
+*Informative note, the batch chain.* In the export named
+`oss-batches-chain.json`, `verdict_outcome` and `ruleset_id` are not verdicts.
+That chain records batches of third-party chain heads and no engine evaluated
+anything: the two fields hold fixed batch metadata the row format requires,
+`seetrex-oss-batch-v1` and `SATISFIED` on every row. `verdict_hash` there is the
+RFC 6962 root of a batch, so the class the table gives it does not hold for
+these rows: it has no §7 preimage, `verify-package` does not apply, and a root
+is checked from one of its members with `verify-record`, which arrives with verifier 0.3.8. That export is not published yet.
+`verify-chain` passes over the export as over any other. `schema_version` stays
+`"1.0"`, and this note changes nothing a verifier MUST do.
+
 ---
 
 ## 9. Verification modes: what each proves, and what it does not

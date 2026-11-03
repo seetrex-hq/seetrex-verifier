@@ -16,8 +16,8 @@ package specification are open (Apache-2.0); the inference engine, the
 derivation dispatcher, the connectors and the SaaS backend are closed. The
 open crates give full independent verification of registry integrity
 (hashes, evidence, chain, anchor); re-deriving a verdict outcome re-runs the
-engine, which is available as a signed reproducible binary or as a source
-rebuild under NDA. See `crates/verifier/README.md` for the full statement.
+engine, which is available on request as a signed reproducible binary or as a
+source rebuild under NDA. See `crates/verifier/README.md` for the full statement.
 
 ## Spec
 

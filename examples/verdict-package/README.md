@@ -122,8 +122,8 @@ guarantee:
 >    with no vendor involvement at all.
 > 2. **Outcome re-derivation — engine execution required.** Recomputing the
 >    verdict *outcome* from the derived facts re-runs the inference engine,
->    which is not open source. It is available as a signed, reproducibly built
->    binary (black box), or as a source rebuild under NDA for regulators.
+>    which is not open source. It is available on request as a signed, reproducibly
+>    built binary (black box), or as a source rebuild under NDA for regulators.
 
 Package integrity also says nothing about *freshness or chain position* (a
 genuine but superseded verdict still passes) nor about the truthfulness of the

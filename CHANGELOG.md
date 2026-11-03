@@ -39,8 +39,8 @@ not contain.
   `seetrex-verifier-offline.html`: one self-contained HTML file with a
   `wasm32-unknown-unknown` build of this same library embedded in it, opened
   from disk with the network off. It answers `verify-package` and
-  `verify-chain` only — `verify-anchor`, `emit-sbom` and `verify-sbom` have no
-  browser leg — and it prints this crate's own lines and outcome tokens, with
+  `verify-chain` only — `verify-anchor`, `verify-record`, `emit-sbom` and
+  `verify-sbom` have no browser leg — and it prints this crate's own lines and outcome tokens, with
   no second vocabulary of its own. It makes no network request of any kind,
   which is checked as a property of the file's text; it cannot refuse a
   symlinked package member the way the executable does (the declared limit of
@@ -90,6 +90,50 @@ not contain.
   that does and what it holds. Neither that section nor this file names a
   digest of any release asset: what anchors the bytes is the key that signs
   the list.
+
+## [seetrex-verifier 0.3.8] — 2026-11-03
+
+This release adds a subcommand, `verify-record`, and a kit format,
+`seetrex/anchor-kit/v2`, under which `verify-anchor` and `verify-record` check
+the submitter signature of the log's leaves. Under a `seetrex/anchor-kit/v1`
+kit, `verify-anchor` keeps its verdict and its exit code on every input and
+prints one line more, a second with `--monitor` when the COMPLETITUD rules ran,
+and a longer footer. The binaries `0.3.3` to `0.3.7` refuse a v2 kit, exit 2.
+This entry was written from the tree the release is cut from: re-observation
+against the published `0.3.8` is owed (release runbook, section 7).
+
+### Changed
+- Breaking at the source level for a caller of the library, under the semver convention Cargo resolves a `0.3.x` by, and recorded here as such: `AuditorKit` gains the public field `identity_pubkeys`, so a struct literal of it stops compiling; `KitError` gains `IdentityPubkeysInV1Kit`, `IdentityPubkeysRequired`, `DuplicateIdentityPubkey`, `InvalidIdentityPubkey` and `GenesisKeyNotInKit`, so an exhaustive `match` on it stops compiling. `RecordError` is new with the `record` module of this same release, so `KitLacksIdentityKeys` and `KitMissingIdentityKey` break nobody against `0.3.7`; like `KitError` it is not `#[non_exhaustive]`, so any variant added after this release will. No published signature changes, and `verify_anchored_package` and `verify_anchored_package_with_chain` keep their behaviour: the signatures live in the new `verify_anchored_package_with_kit`.
+- `verify-anchor` under a `seetrex/anchor-kit/v2` kit: a leaf of a `--monitor` bundle that is in the log under a key of the kit without its signature does not count for COMPLETITUD, and the line `monitor leaves:`, printed when the rules ran, counts them; one that does not include or serialize is FAILED, as under a v1 kit. A key the rotations of the bundle reach and the kit lacks is exit 2, as for those of the package, ahead of a COMPLETITUD FAILED. Under a v1 kit the same line says `NOT CHECKED`, and a made-up leaf in a bundle can accuse and can absolve.
+
+### Added to the crate
+- `seetrex/anchor-kit/v2`: the v1 kit plus `identity_pubkeys`, the raw public keys
+  of the producer identity. One of them must hash to `genesis_key_hash`; duplicates,
+  an empty list and a key that cannot verify (not a point, or of small order) are
+  refused, exit 2. Binaries before this one refuse the field, exit 2.
+- With a v2 kit, `verify-anchor` and `verify-record` check the submitter signature
+  of every anchored leaf and of every followed rotation, over the 56 bytes
+  `"sigsum.org/v1/tree-leaf" 0x00 checksum`: an invalid one is exit 1, a derived key
+  the kit lacks is exit 2, with the key named. Anomalous rotations are not checked,
+  and the leaves of a `--monitor` bundle count as `### Changed` above says.
+- With a v1 kit, `verify-anchor` keeps its verdict and its exit code and prints
+  `submitter signatures: NOT CHECKED`. `verify-record` refuses a v1 kit on a record
+  with a proof, exit 2.
+- Library: `verify_anchored_package_with_kit`, `KitPackageReport`,
+  `checkpoint::verify_submitter_signature`, `SIGSUM_LEAF_NAMESPACE`,
+  `ANCHOR_KIT_V2_VERSION`, five `KitError` variants and two `RecordError` ones.
+  `AuditorKit` gains the public field `identity_pubkeys`, so code that builds one
+  by hand needs it (`Vec::new()` is a v1 kit). The functions published in `0.3.3`
+  keep their signatures and read no signature.
+- `verify-record <record.json> [--kit <kit.json>]`: offline verification of a
+  `seetrex.record.v1` file (`record::verify_record`). It recomputes the chain the
+  file carries and walks its proof, from the last proved row through the batch
+  chain `oss-batches` to a leaf of the cosigned log, under the policy of the
+  kit. Exit 0 anchor confirmed, 4 no anchor yet, 1 failed or malformed, 2 the
+  auditor's own input. The chain export format, `anchor.json` and the lane set
+  do not change. `0.3.7` does not have it. A
+  `repository_as_told` outside `owner/repo` prints as `<hex:...>`, and a proof with
+  more than 256 rotations or 64 cosignatures is refused before any signature.
 
 ## [seetrex-verifier 0.3.7] — 2026-09-01
 
