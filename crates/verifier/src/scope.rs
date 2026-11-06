@@ -41,17 +41,19 @@ pub const SCOPE_NOT_COVERED: &str = "NOT covered by this check: the \
     unverified metadata; the last two you cannot verify at all.";
 
 /// F2 — the shared scope-of-comparison claim common to both surfaces' "compare
-/// these two values" line. Each binary prints its own leading URL sentence
-/// (the private CLI's naming the permanent `seetrex.com/trust/` alias) and then
-/// interpolates this claim verbatim, so the shared invariant is this
-/// sub-phrase, not the full line.
+/// these two values" line. Each binary prints its own leading sentence and
+/// then interpolates this claim verbatim, so the shared invariant is this
+/// sub-phrase, not the full line. Since 2026-11-04 the vendor
+/// serves no chain and no page, so neither leading sentence names one: both
+/// send the auditor to the head the vendor states over a channel other than
+/// the one that delivered the file.
 pub const SCOPE_LINK_CLAIM: &str = "A match proves this file agrees with what \
-    the vendor publishes RIGHT NOW — nothing more. It does NOT prove rows were \
-    not removed: a vendor who republishes a truncated chain also republishes \
-    its shorter head, so both sides of this comparison move together. What \
-    catches removal is material you kept earlier — a copy of this export, or a \
+    the vendor states RIGHT NOW — nothing more. It does NOT prove rows were \
+    not removed: a vendor who truncates the chain also states its shorter \
+    head, so both sides of this comparison move together. What catches \
+    removal is material you kept earlier — a copy of this export, or a \
     verdict package whose verdict_hash (recompute it with `verify-package`) \
-    still appears in a row of the published chain. Each export you fetch \
+    still appears in a row of this chain. Each export you receive \
     should extend the prefix you already hold, not rewrite it; keeping and \
     comparing that material is your step. This tool has no command for either \
     comparison; you must keep the material and make it yourself.";

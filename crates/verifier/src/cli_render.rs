@@ -90,8 +90,8 @@ pub fn render_chain_read_failure(name: &str, detail: &str) -> CommandOutput {
 
 /// The advice an unanchored pass prints, verbatim.
 const UNANCHORED_HINT: &str = "HINT: pass --expected-verdict-hash <hex> (obtained \
-                               from the published chain export or another external \
-                               channel) to upgrade this to INTEGRITY-OK (weak) — \
+                               from the vendor's chain export or another channel \
+                               independent of this package) to upgrade this to INTEGRITY-OK (weak) — \
                                the package can never be its own trust root.";
 
 /// One rendered run: the lines a surface emits, and the code it exits with.
@@ -203,8 +203,9 @@ pub fn render_verify_chain(result: Result<ChainHead, ChainVerifyError>) -> Comma
                 // NOT inputs to it, so editing them leaves every link — and
                 // this head hash — intact.
                 format!(
-                    "Compare these two values against the vendor's public Trust \
-                     Center page for this tenant. {SCOPE_LINK_CLAIM}"
+                    "Compare these two values against the head the vendor states \
+                     to you over a channel other than the one that delivered this \
+                     file. {SCOPE_LINK_CLAIM}"
                 ),
                 String::new(),
                 SCOPE_NOT_COVERED.to_string(),

@@ -83,8 +83,8 @@ This check re-computes hashes only. It does NOT re-execute the inference engine 
 ```
 
 Exit code `0`. The anchor hash is read from the chain export — a file obtained
-**outside** the package — exactly as you would read it from a vendor's public
-Trust Center. In this example the chain holds a single genesis row, so its
+**outside** the package, as you would receive it from the vendor (the public
+Trust Center that used to serve it was retired on 2026-11-04). In this example the chain holds a single genesis row, so its
 `chain_hash` is the SHA-256 of the ASCII bytes of the `verdict_hash` alone; a
 real chain links every later row to its predecessor.
 

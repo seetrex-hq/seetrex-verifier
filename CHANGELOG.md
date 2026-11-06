@@ -32,7 +32,10 @@ entry of the first release CUT with the page, and `0.3.7` is not that release.
 Its entry below says this release is a repair «and nothing else», which is
 true of the crate it published on 2026-09-01; the page was attached to that
 same release two days later, by a separate job, out of a tree the crate does
-not contain.
+not contain. `0.3.8` is not that release either: its page was attached by
+the same separate job, after the crate was published, and a page for `0.3.9` can only reach its release the same way. No release
+of this crate is cut WITH the page, so these bullets stay here until a
+release job builds the page as part of the cut itself.
 
 ### Added
 - A signed release may now carry an OFFLINE BROWSER PAGE,
@@ -100,6 +103,66 @@ not contain.
   the installed `0.3.8`. That revision of the kit,
   `2026-11-03-recapture-0-3-8`, is the record; this file restates none of its
   figures.
+
+## [seetrex-verifier 0.3.9] — 2026-11-07
+
+This release changes wording and nothing else: the lines that sent an
+auditor to the public Trust Center, retired on 2026-11-04, now send them to
+what the vendor states over another channel. Existing commands, formats and
+exit codes are unchanged: no subcommand, flag, outcome token or exit code
+moves between `0.3.8` and this tree, and the help exit codes measured by
+`tests/bin_e2e.rs` are those observed against the published `0.3.8`. Unlike
+`0.3.7`, the change is not confined to the executable: it reaches the
+library modules that print the lines (`anchor_completitud.rs`,
+`cli_render.rs`, `package.rs`, `scope.rs`), so their text differs from the
+`0.3.8` tarball while their checks do not. This entry was written from the
+tree the release is cut from; the re-observation against the published
+`0.3.9` is owed (release runbook, section 7).
+
+### Changed
+- The public Trust Center was retired for every tenant on 2026-11-04: the
+  vendor offers no chain, page or anchor file any more, and the chain export
+  reaches the auditor from the vendor, or inside the `seetrex-record.json`
+  artifact of the GitHub Action. `verify-chain` no longer tells the auditor to
+  compare its head with "the vendor's public Trust Center page for this
+  tenant"; it now prints "Compare these two values against the head the vendor states to you over a channel other than the one that delivered this file."
+  The scope sentence after it, which the vendor's CLI interpolates too, says
+  "what the vendor states" instead of "what the vendor publishes", "a vendor
+  who truncates the chain also states its shorter head" instead of "a vendor
+  who republishes a truncated chain also republishes its shorter head", "a
+  row of this chain" instead of "a row of the published chain" and "Each
+  export you receive" instead of "Each export you fetch", and keeps every
+  limit it stated: a match does not prove rows
+  were not removed, only material kept earlier catches that, and the four
+  human-readable columns stay unbound. The same change, and only it, reaches
+  these other texts: `--help` (its first line, the anchor example of
+  `verify-package`, and the entries of `verify-chain`, `verify-anchor` and
+  its `--chain` flag); the scope line and the unanchored hint of
+  `verify-package`, which now say "the vendor's chain export" and "another
+  channel independent of this package"; and, in `verify-anchor`, the
+  `--chain` remedies (which also say "a head neither artefact reaches" where
+  they said "a head no published artefact reaches"), the finding against the
+  export's row, the length-rule
+  finding ("no artefact of this run reaches"), the two reasons an export is
+  DECLINED ("DECLINED as evidence") and the `truncation reference` line,
+  which say "chain export" where they said "published chain export". Kept on
+  purpose: the strong-pass banner `Public chain package VERIFIED OFFLINE`, a
+  frozen marker that spec section 8.1 ("The public chain export") quotes,
+  the reference implementation prints byte for byte and the golden fixture
+  and `kit_doc` pin, where "public" names the
+  hash-only export FORMAT and not a place; the error `package is not a valid
+  public chain export`, which names the same format; the `verify-anchor`
+  findings that say what the anchor PACKAGE published ("published row",
+  "package published HEAD@"); the two `verify-anchor` failure reasons of
+  `anchor.rs` ("tail leaf stays published", "published history was
+  rewritten"), where the word names what the log and the anchored head
+  committed, not a place to fetch a file from; and the scope block's "no artifact we publish
+  binds them", which is about the vendor's own artefacts and is shared byte
+  for byte with the vendor's CLI. The transcripts in `docs/AUDITOR_KIT.md`
+  and `examples/verdict-package/README.md` were captured with the published
+  `0.3.8` and show its wording; their re-capture with the published `0.3.9`
+  is owed (release runbook, section 7). No check, verdict or exit code
+  changed.
 
 ## [seetrex-verifier 0.3.8] — 2026-11-03
 

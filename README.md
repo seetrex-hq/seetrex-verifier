@@ -50,12 +50,12 @@ cargo test --locked
 ## Getting the verification tool
 
 `seetrex-verifier` has shipped an installable command-line binary of the
-same name since 0.3.0. Install the current version, `0.3.8`: the `0.3.0`
+same name since 0.3.0. Install the current version, `0.3.9`: the `0.3.0`
 and `0.3.1` binaries printed a `verify-chain` trailer that overstated the
 scope of that check, and must not be used as the executable.
 
 ```bash
-cargo install seetrex-verifier --locked --version 0.3.8
+cargo install seetrex-verifier --locked --version 0.3.9
 
 seetrex-verifier verify-package <dir> [--expected-verdict-hash <hex>]
 seetrex-verifier verify-chain <chain-export.json>
@@ -70,10 +70,10 @@ seetrex-verifier verify-sbom --kind <cargo|composer|npm> --lockfile <path>
                              --sbom <path> [--third-party] [--dep-v0 <elf>]
 ```
 
-`verify-anchor` is new in 0.3.3: it checks a producer-published anchor package
+`verify-anchor` is new in 0.3.3: it checks a producer's anchor package
 offline against a transparency log's cosigned checkpoint, under the policy
 pinned in the auditor `kit.json`. Its `--chain` input is new in 0.3.4 and
-supplies the producer's published chain export as the reference the truncation
+supplies the producer's current chain export as the reference the truncation
 rule judges against; without it, a head beyond the package's rows is reported
 INCONCLUSIVE and the exit code stays 0, so read the COMPLETITUD line rather
 than the exit status alone.

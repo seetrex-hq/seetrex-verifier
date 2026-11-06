@@ -123,7 +123,7 @@ const CHAIN_FILE_MAX_BYTES: u64 = CHAIN_EXPORT_MAX_BYTES;
 
 const HELP: &str = "\
 seetrex-verifier — offline verification of Seetrex Compliance verdict
-packages and public chain exports (spec: SPEC_VERDICT_PACKAGE_V1.md).
+packages and chain exports (spec: SPEC_VERDICT_PACKAGE_V1.md).
 
 USAGE:
     seetrex-verifier verify-package <dir> [--expected-verdict-hash <hex>]
@@ -143,16 +143,16 @@ COMMANDS:
     verify-package    Package integrity check over an extracted package
                       directory (spec section 9.6). Re-computes hashes
                       only. With --expected-verdict-hash (an anchor
-                      obtained OUTSIDE the package, e.g. from the public
+                      obtained OUTSIDE the package, e.g. from the vendor's
                       chain export): INTEGRITY-OK (weak), exit 0.
                       Without it: SELF-CONSISTENT (unanchored), exit 4 —
                       NOT a verification. Any failure: exit 1.
-    verify-chain      Offline verification of a downloaded public chain
-                      export (spec section 8.1): recomputes every
+    verify-chain      Offline verification of a chain export received
+                      from the vendor (spec section 8.1): recomputes every
                       SHA-256 link and reports the chain head. Success:
                       exit 0. Any failure: exit 1.
-    verify-anchor     Offline verification of a producer's published
-                      anchor package (<anchor.json>) against your PINNED
+    verify-anchor     Offline verification of a producer's anchor
+                      package (<anchor.json>) against your PINNED
                       auditor kit (--kit <kit.json>, supplying the tenant,
                       genesis key and witness policy — NEVER read from the
                       package). Reports the two v6 verdicts: CONSISTENCIA
@@ -173,7 +173,7 @@ COMMANDS:
                       a key of the kit without its signature is discarded,
                       and the run counts them. A v1 kit prints NOT CHECKED, for the
                       package and for the monitor. --chain <chain.json>
-                      is the producer's CURRENT published chain export,
+                      is the producer's CURRENT chain export,
                       the input that DECIDES COMPLETITUD's truncation rule:
                       a package is a SNAPSHOT and legitimately LAGS the log,
                       so without the export a monitor head beyond the
@@ -974,13 +974,13 @@ fn truncation_reference_line(
             "package rows only, {package} rows (no --chain; heads past N are UNDECIDABLE)"
         ),
         (Some(n), None) => format!(
-            "published chain export, {n} rows (package {package}; reference N={})",
+            "chain export, {n} rows (package {package}; reference N={})",
             r.reference_rows
         ),
         // A DECLINED export is NOT evidence: say so, and show the reference the rule
         // really used, which is the package alone.
         (Some(n), Some(_)) => format!(
-            "published chain export DECLINED ({n} rows, not used); package rows only, \
+            "chain export DECLINED ({n} rows, not used); package rows only, \
              {package} rows; reference N={}",
             r.reference_rows
         ),

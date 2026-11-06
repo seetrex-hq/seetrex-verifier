@@ -325,3 +325,44 @@ fn test_intent_blind_transcript_names_the_spec_it_saw() {
          name no commit is prose again."
     );
 }
+
+/// The English number word written just before `suffix` in `text` (whitespace
+/// folded, so a line break inside the phrase does not hide it), as a count.
+fn count_word_before(text: &str, suffix: &str) -> Option<usize> {
+    const WORDS: [&str; 21] = [
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
+        "eighteen", "nineteen", "twenty",
+    ];
+    let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let end = flat.find(suffix)?;
+    let word = flat[..end].rsplit(' ').next()?;
+    WORDS.iter().position(|w| *w == word)
+}
+
+/// INTENCION: the prose under the hash table counts its rows in words (the
+///     corrections from DIV-01 to R3b, and «the other N» that corrected
+///     nothing). A count written by hand is the part that goes stale when a
+///     row is appended, and a stale count hides the very edit the table
+///     exists to show.
+/// CONTEXTO: 2026-11-04 — the row of the security limit of 9.3 was appended and
+///     the paragraph had to move from «six» to «seven»; no test tied the
+///     word to the table.
+/// EXPIRA SI: the paragraph stops counting the rows in words.
+#[test]
+fn test_intent_blind_transcript_prose_counts_its_rows() {
+    let transcript = fs::read_to_string(crate_root().join(TRANSCRIPT_REL))
+        .expect("the transcript is readable");
+    let rows = hash_rows(&transcript).len();
+    let corrections = count_word_before(&transcript, " rows from DIV-01 to R3b")
+        .expect("the paragraph names how many rows run from DIV-01 to R3b, in words");
+    let others = count_word_before(&transcript, " corrected nothing")
+        .expect("the paragraph names how many other rows corrected nothing, in words");
+    assert_eq!(
+        1 + corrections + others,
+        rows,
+        "{TRANSCRIPT_REL} has {rows} dated hash rows, but its prose counts the \
+         first row, {corrections} corrections and {others} other rows. A row \
+         was appended without the paragraph under the table following it."
+    );
+}

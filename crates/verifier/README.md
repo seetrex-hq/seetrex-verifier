@@ -21,12 +21,12 @@ consumes this crate and adds the inference engine on top):
 ## Command-line tool
 
 The crate has shipped an installable binary of the same name since 0.3.0
-(0.2.0 was library-only). Install the current version, `0.3.8`: the `0.3.0`
+(0.2.0 was library-only). Install the current version, `0.3.9`: the `0.3.0`
 and `0.3.1` binaries printed a `verify-chain` trailer that overstated the
 scope of that check, and must not be used as the executable.
 
 ```console
-cargo install seetrex-verifier --locked --version 0.3.8
+cargo install seetrex-verifier --locked --version 0.3.9
 
 seetrex-verifier verify-package <dir> [--expected-verdict-hash <hex>]
 seetrex-verifier verify-chain <chain-export.json>
@@ -51,17 +51,17 @@ and exits 0; a pass without an external anchor prints
 `SELF-CONSISTENT (unanchored)` and exits 4 (NOT a verification — a
 coherent forgery is self-consistent by construction); any failure exits 1.
 Always pass `--expected-verdict-hash` with a value obtained OUTSIDE the
-package (e.g. from the published chain export).
+package (e.g. from the vendor's chain export).
 
-`verify-chain` verifies a downloaded public chain export fully offline
+`verify-chain` verifies a chain export received from the vendor fully offline
 (spec section 8.1): it recomputes every SHA-256 link and reports the
-chain head (`verdict_count`, `last_chain_hash`) to compare against the
-published tenant page. Exit 0 on success, 1 on any failure.
+chain head (`verdict_count`, `last_chain_hash`) to compare against the head
+the vendor states over another channel. Exit 0 on success, 1 on any failure.
 
-`verify-anchor` checks a producer-published anchor package OFFLINE against a
+`verify-anchor` checks a producer's anchor package OFFLINE against a
 transparency log's cosigned checkpoint, under the policy pinned in the auditor
 `kit.json`. From 0.3.8, a `seetrex/anchor-kit/v2` kit also pins the public keys of the identity: the submitter signatures of the anchored leaves and followed rotations are checked (an invalid one is exit 1; a key derived from the rotations of the package or of a monitor bundle that the kit lacks is exit 2, which prevails over a COMPLETITUD FAILED), and a monitor leaf in the log under a key of the kit without its signature is discarded and counted; one that does not include or serialize is FAILED, as under a v1 kit. A v1 kit prints NOT CHECKED, and 0.3.7 refuses a v2 kit, checks no signature and does not say so. With `--monitor` it also confronts the package with an independent
-enumeration of the log. `--chain` supplies the producer's published chain
+enumeration of the log. `--chain` supplies the producer's current chain
 export as the reference the truncation rule judges against: without it, a head
 beyond the package's rows is reported INCONCLUSIVE and the exit code stays 0,
 so read the COMPLETITUD line and not the exit status alone.
@@ -153,9 +153,9 @@ can withhold or delay leaves, so it stays part of what you trust. A
 of at most 256 bytes prints as `<hex:...>`.
 
 `verify-chain` does not read a record: the whole file is exit 1. It takes the
-`chain` member extracted into a file of its own (`jq .chain record.json`). Its
-comparison with the Trust Center does not apply to the chain of a private
-repository, which is published nowhere.
+`chain` member extracted into a file of its own (`jq .chain record.json`). The
+vendor publishes no chain since 2026-11-04: compare the head it prints with a
+copy you kept earlier or a value obtained over a channel independent of the file.
 
 In `oss-batches-chain.json`, `verdict_outcome` and `ruleset_id` are batch
 metadata the row format requires, not verdicts: no engine evaluated anything,

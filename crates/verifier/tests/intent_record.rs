@@ -2583,6 +2583,196 @@ fn test_intent_up_to_date_kit_passes_an_honest_rotated_log() {
     assert!(stdout.contains("monitor leaves:          0 discarded"), "{stdout}");
 }
 
+/// The checked-in record of the whole block a confirmed `verify-anchor` run
+/// prints. It is data; the test below makes it true by spawning the executable,
+/// and the kit's documentation test (a private consumer) compares the capture of
+/// the auditor kit's section 7.1 with it.
+const ANCHOR_CAPTURE_RECORD: &str = include_str!("fixtures/anchor_capture_lines.tsv");
+
+/// Fill the `{name}` placeholders of one record line from `values`. An unknown
+/// name, a stray brace or a malformed name is a panic, and so is a value the line
+/// never asks for when `used` is checked by the caller: nothing is skipped.
+fn fill_capture_line(line: &str, values: &[(&str, &str)], used: &mut Vec<String>) -> String {
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some(open) = rest.find(['{', '}']) {
+        assert_eq!(&rest[open..open + 1], "{", "stray `}}` in record line {line:?}");
+        out.push_str(&rest[..open]);
+        let close = rest[open..]
+            .find('}')
+            .unwrap_or_else(|| panic!("unclosed placeholder in record line {line:?}"))
+            + open;
+        let name = &rest[open + 1..close];
+        assert!(
+            !name.is_empty() && name.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
+            "malformed placeholder {{{name}}} in record line {line:?}"
+        );
+        let value = values
+            .iter()
+            .find(|(k, _)| *k == name)
+            .unwrap_or_else(|| panic!("record line {line:?} asks for {{{name}}}, which no value fills"))
+            .1;
+        out.push_str(value);
+        used.push(name.to_string());
+        rest = &rest[close + 1..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The third and fourth keys of the rotated identity of [`capture_run`].
+const THIRD_KEY_SEED: u8 = 0xBB;
+const FOURTH_KEY_SEED: u8 = 0xCC;
+
+/// A confirmed `verify-anchor --monitor` run whose counts are all different: six
+/// chain rows; three followed rotations, genesis -> k2 -> k3 -> k4, each signed by
+/// its old key; two heads (rows 4 and 6) anchored under k4; and, in the bundle only,
+/// a head of row 5 under k4 with a signature nobody made. The kit pins the four keys.
+fn capture_run() -> (i32, String, String) {
+    const ROWS: u32 = 6;
+    let rows = tenant_rows(ROWS);
+    let head = |ordinal: usize| {
+        json!({
+            "kind": "head",
+            "slug": BATCH_SLUG,
+            "ordinal": ordinal,
+            "chain_hash": rows[ordinal - 1]["chain_hash"].clone(),
+        })
+    };
+    let chain = [GENESIS_SEED, NEW_KEY_SEED, THIRD_KEY_SEED, FOURTH_KEY_SEED];
+    let mut entries: Vec<Entry> = chain
+        .windows(2)
+        .zip(1u64..)
+        .map(|(pair, n)| signed(rotate(n, pair[0], pair[1]), pair[0]))
+        .collect();
+    let rotations = entries.len();
+    entries.push(signed(head(4), FOURTH_KEY_SEED));
+    entries.push(signed(head(6), FOURTH_KEY_SEED));
+    entries.push(unsigned(head(5), FOURTH_KEY_SEED));
+    let (leaves, checkpoint) = log_of(&entries);
+    let package = json!({
+        "version": "seetrex/anchor/v1",
+        "tenant_slug": BATCH_SLUG,
+        "rows": rows,
+        "checkpoint": checkpoint,
+        "anchored_leaves": leaves[rotations..rotations + 2],
+        "rotations": leaves[..rotations],
+    });
+    let bundle = json!({
+        "version": "seetrex/anchor-monitor/v1",
+        "c_audit": checkpoint,
+        "leaves": leaves,
+        "consistency_proof": [],
+        "observations": [{"slug": BATCH_SLUG, "served": true}],
+    });
+    let anchor = tmp("anchor.json", package.to_string().as_bytes());
+    let kit = tmp("kit.json", kit_v2(BATCH_SLUG, &chain).to_string().as_bytes());
+    let monitor = tmp("monitor.json", bundle.to_string().as_bytes());
+    let out = run(&[
+        "verify-anchor",
+        anchor.to_str().unwrap(),
+        "--kit",
+        kit.to_str().unwrap(),
+        "--monitor",
+        monitor.to_str().unwrap(),
+    ]);
+    (
+        out.status.code().expect("exit code"),
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+    )
+}
+
+/// INTENT: the block of a confirmed `verify-anchor` run that the kit's section 7.1
+///   capture shows, and the footer under it, are decided by RUNNING the executable
+///   and comparing its whole stdout, line by line and in order, never by reading
+///   this crate's source.
+/// CONTEXT: review of the `0.3.8` recapture (C-1): the kit's test matched each
+///   template by prefix in the SOURCE of the binary, and a `// was: "…"` comment
+///   carrying the old wording kept it green while the `println!` printed «under
+///   ANY key». A later review (I-1, I-2) found that only two lines were measured:
+///   renaming `rotations checked:`, moving `identity keys:` below `monitor leaves:`,
+///   truncating the footer or printing a line before it all stayed green. A third
+///   review (C-1) found that the run had equal counts (1 anchored leaf and 1
+///   rotation; 2 keys, 2 signatures and 2 rows), so printing one count in
+///   another's slot stayed green: every count of the run is now a different number,
+///   and the test checks that before it runs.
+/// DECLARED LIMIT: this measures the binary THIS package builds, on a synthetic
+///   kit and bundle; the values the capture shows (508, 563, the tenant) are not
+///   reproduced, only the text around them, which is why each is a placeholder.
+///   The `anomalous rotations:` line is not in the block: this run has none, as
+///   the captured run had none.
+/// EXPIRES IF: the confirmed block leaves the output, or section 7.1 stops
+///   showing it.
+/// MUTANT: reword, add, drop or reorder any `println!` of the confirmed arm (a
+///   comment keeping the old wording included); print the footer truncated or with
+///   a line before it; edit, delete, add or reorder a row of the record; print one
+///   count in another count's slot (anchored leaves for rotations, signatures for
+///   keys, and the reverse).
+#[test]
+fn test_intent_anchor_capture_lines_are_measured_not_parsed() {
+    let rows: Vec<(&str, &str)> = ANCHOR_CAPTURE_RECORD
+        .lines()
+        .map(|l| l.trim_end_matches('\r'))
+        .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+        .map(|l| {
+            l.split_once('\t')
+                .unwrap_or_else(|| panic!("record row is not `<key><TAB><line>`: {l:?}"))
+        })
+        .collect();
+
+    // Every value is fixed by the inputs below (`capture_run`): the package carries
+    // six chain rows, three followed rotations (genesis -> k2 -> k3 -> k4) and two
+    // anchored heads; the identity keys are the genesis and the three rotations';
+    // the five signatures of the package (three rotations, two heads) are read
+    // against the four keys of the kit; and the bundle holds one more head under a
+    // key of the kit with a signature nobody made, which is discarded.
+    let values = [
+        ("tenant", BATCH_SLUG),
+        ("anchored", "2"),
+        ("rotations", "3"),
+        ("keys", "4"),
+        ("signatures", "5"),
+        ("discarded", "1"),
+        ("rows", "6"),
+    ];
+    // Each count must be distinct from every other one: two equal counts let the
+    // binary print one in the other's slot and still produce this stdout.
+    let counts: Vec<&str> =
+        values.iter().filter(|(k, _)| *k != "tenant").map(|(_, v)| *v).collect();
+    for (i, a) in counts.iter().enumerate() {
+        assert!(
+            counts[i + 1..].iter().all(|b| b != a),
+            "the count {a} fills two placeholders: a value printed in the wrong slot \
+             would go unseen"
+        );
+    }
+    let mut used = Vec::new();
+    let expected_block: Vec<String> =
+        rows.iter().map(|(_, line)| fill_capture_line(line, &values, &mut used)).collect();
+    for (name, _) in values {
+        assert!(
+            used.iter().any(|u| u == name),
+            "the value for {{{name}}} is filled in nowhere in the record"
+        );
+    }
+
+    let (code, stdout, stderr) = capture_run();
+    assert_eq!(code, 0, "{stdout}\n{stderr}");
+    // The WHOLE stdout: the record's block, in order, then one empty line, then the
+    // scope footer exactly as the library defines it, then nothing.
+    let expected = format!(
+        "{}\n\n{}\n",
+        expected_block.join("\n"),
+        seetrex_verifier::scope::SCOPE_ANCHOR
+    );
+    assert_eq!(
+        stdout.replace("\r\n", "\n"),
+        expected,
+        "the binary's stdout is not the record's block followed by the scope footer"
+    );
+}
+
 /// INTENT: the same leaf presented twice in a bundle is one rotation, not a fork, so
 ///   the walk of the keys goes past it and a stale kit still owes the key it reaches.
 /// CONTEXT: a bundle is free to repeat a leaf, and `keys_reached_from` drops repeats.

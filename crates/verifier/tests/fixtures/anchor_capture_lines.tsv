@@ -1,0 +1,42 @@
+# What `seetrex-verifier verify-anchor --kit <v2 kit> --monitor <bundle>` REALLY
+# prints on stdout for a confirmed run with no anomalous rotation, in this tree:
+# the WHOLE block from the banner to the COMPLETITUD line, every line, in order.
+# The binary then prints one empty line and the scope footer
+# (`seetrex_verifier::scope::SCOPE_ANCHOR`), and nothing after it.
+#
+# This file is an OBSERVATION, not a claim. `crates/verifier/tests/intent_record.rs`
+# (`test_intent_anchor_capture_lines_are_measured_not_parsed`) spawns the built
+# executable on a synthetic v2 kit and monitor bundle, fills every placeholder
+# with the value that run must print, and asserts that the process's stdout is
+# EXACTLY these rows, in this order, followed by the empty line and the footer.
+# No line of the block can be reworded, added, dropped or moved in the binary
+# without this file moving with it.
+#
+# A private consumer (the kit's documentation test) reads this file instead of
+# parsing the verifier's source: it fills each placeholder with the value the
+# capture in section 7.1 of the auditor kit shows and compares the result with
+# the captured block, whole lines, in order.
+#
+# Format: <key><TAB><line>, one row per printed line, in the order printed.
+# <key> names the row and is never printed. <line> is byte for byte what the
+# binary prints, leading spaces included, except for PLACEHOLDERS: `{name}`,
+# with `name` in lowercase letters and `_`, stands for ONE value that depends
+# on the run (a count, the tenant) and nothing else; the text around it is
+# fixed. No other `{` or `}` appears in a line. Each consumer must fill every
+# placeholder it finds and must use every value it brings: an unknown name or
+# an unused value is a failure, never a skip.
+#
+# Placeholders: {tenant} the kit's tenant_slug; {anchored} anchored leaves of
+# the package; {rotations} rotations of the package; {keys} identity keys
+# derived; {signatures} submitter signatures checked; {discarded} monitor
+# leaves discarded; {rows} rows of the package the truncation rule judged
+# against (no --chain).
+banner	Anchor package CONSISTENCIA CONFIRMED OFFLINE
+tenant	  tenant:                  "{tenant}"
+anchored leaves	  anchored leaves checked: {anchored}
+rotations	  rotations checked:       {rotations}
+identity keys	  identity keys:           {keys} (genesis + accepted rotations)
+submitter signatures	  submitter signatures:    {signatures} checked against the keys of the kit
+monitor leaves	  monitor leaves:          {discarded} discarded (in the log under a key of the kit, without its signature: not counted for COMPLETITUD)
+truncation reference	  truncation reference:    package rows only, {rows} rows (no --chain; heads past N are UNDECIDABLE)
+completitud	  COMPLETITUD:             CONFIRMED OFFLINE (monitor supplied; enumeration completeness = trusted input)

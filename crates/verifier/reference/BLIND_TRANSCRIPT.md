@@ -37,7 +37,13 @@ What an auditor can verify from here:
 | 2026-08-30 | `7ea0fa101734a679c620c1c9f5d3d6c8959999f4831d44e8705d4a8a2fc9d768` | `3c190523` | after the R3b clarification: a leading `-` signs only a ZERO year (`-2026-05-13` reaches String), the one reading the blind aligner had flagged as decided by sentence rather than by witness |
 | 2026-08-30 | `2059f53a2353058d3507149bd1b5bb1625bc9632c75b7000ad899d09806a7f9c` | `40ac3121` | after the merge into main: the status line no longer says "pending adversarial review" (this reference implementation and its two instruments were that review); it names the reference limits and the dependency pins, and warns holders of earlier copies |
 | 2026-11-01 | `73ecb1a51f71d18427576aa7c63f429559e3ac0a98a7f0a2eb886277048aea17` | `1429e439` | an informative note in 8.1 on `oss-batches-chain.json`: its `verdict_outcome` and `ruleset_id` are batch metadata, its `verdict_hash` is a Merkle root, and neither the file nor `verify-record` is published yet. No MUST moved and the reference implementation was not touched |
-| 2026-11-02 | `78adcd64e681d3ac3411e34c8a214e9dc01063f07f8a772365338fc0b1da35e5` | `HEAD` | an informative note in 8.1 reworded at the release `0.3.8`: `verify-record` arrives with that release, and the sentence no longer says it is not published; no normative text changed |
+| 2026-11-02 | `78adcd64e681d3ac3411e34c8a214e9dc01063f07f8a772365338fc0b1da35e5` | `11aa4aca` | an informative note in 8.1 reworded at the release `0.3.8`: `verify-record` arrives with that release, and the sentence no longer says it is not published; no normative text changed |
+| 2026-11-03 | `6c22c65af0dc25d7ddb41fce76fbdac2c1d5b0370653713fbf6190e829769bfc` | `49040a1d` | the same informative note in 8.1 after the release `0.3.8` was published: `verify-record` is said to be published in that release rather than to arrive with it, and the export it checks is still said not to be published; no normative text changed |
+| 2026-11-05 | `99a910bf26a9eb06cd08a9f4d6d429db8d271d24a6884b6b66ca0503e8ec339a` | `b06778b2` | the same informative note in 8.1 after the retirement of the Trust Center (2026-11-04): the export `verify-record` checks is said not to be published, and to stay local to its producer, rather than not to be published yet; no normative text changed |
+| 2026-11-05 | `186f4d92f9aaceec7a348f4d73018bd06ac883fe5e589ee18e87b7bad1101e1b` | `429a1baa` | where the chain export and the external anchor come from, in 8.1, 9.3 and 9.4: from the vendor, who hands the export over for the audit, and no longer from the Trust Center, retired on 2026-11-04; no MUST moved, nothing a verifier computes or prints changes, and the reference implementation was not touched |
+| 2026-11-05 | `dc491411f20097e0229bb27c826390e3be07c2f1537dc54131a9548ef1904c0c` | `ad686691` | the scope of independent verification made consistent with the vendor-supplied export: §1 no longer counts the external anchor among what the format makes verifiable without the vendor, 8.1 and 9.4 say an export the vendor hands over is not by itself independent of that vendor, and 9.3 gains an informative security limit (one vendor supplying both the package and the export leaves a vendor re-forge undetected, unless a hash recorded earlier or an independent transparency log fixes the expected value); inside the 9.3 MUST only the example «as the vendor hands it over» was dropped, so no MUST changed meaning, nothing a verifier computes or prints changes, and the reference implementation was not touched |
+| 2026-11-05 | `46c5be00181b7c1408fedfa96366a16cfd9de51d1c632074b3fb2371f2c3b42c` | `d6f636ec` | which heads the vendor logs and what each external anchor protects, in 8.1, 9.3 and 9.4: the informative note of 9.3 says the vendor logs the heads of its own chain as Sigsum leaves (the batch chain of 8.1 not yet) and that a hash recorded earlier protects the integrity of the prefix up to its ordinal, not freshness, and not against an export that stops early, against which only an independent log someone monitors protects; 9.4 says a recorded hash does not fix the end of the chain; 8.1 says the retired Trust Center's origin still answers a direct request with earlier files, which is no channel the vendor offers; no MUST moved, nothing a verifier computes or prints changes, and the reference implementation was not touched |
+| 2026-11-05 | `fa7b24d3f3656d89686ea906cff12fa84736631c6cae1c708b301941e1709433` | `HEAD` | the same informative note in 8.1 says what the retired Trust Center's origin still answers a direct request with: the files its hourly pipeline still writes, rather than earlier files; no normative text changed |
 
 **Every row but the last names the COMMIT whose
 `docs/SPEC_VERDICT_PACKAGE_V1.md` hashes to it**, and
@@ -50,10 +56,14 @@ check that already stood.
 
 The first row is the document as the implementer read it; the last is the
 document at this commit. Every row after the first exists because the bytes
-moved after the implementation was frozen, and all but the last of them because
-a divergence between the two legs was classified as a **specification**
-correction -- the first was DIV-01 (hash recomputation over the recovered and
-re-serialized canonical value). The rows of 2026-11-01 and 2026-11-02 are informative notes.
+moved after the implementation was frozen. The seven rows from DIV-01 to R3b,
+all of 2026-08-30, are there because a divergence between the two legs was
+classified as a **specification** correction -- the first was DIV-01 (hash
+recomputation over the recovered and re-serialized canonical value). The other
+nine corrected nothing: the row of the merge into main (2026-08-30, `40ac3121`)
+changed only the status line, the rows of 2026-11-01, 2026-11-02, 2026-11-03
+and the first of 2026-11-05 are informative notes in 8.1, the second of
+2026-11-05 rewords where the export and the external anchor are obtained, the third makes the scope of independent verification consistent with an export the vendor hands over and states the re-forge limit of 9.3, the fourth says which heads the vendor logs and what a recorded hash and a monitored log each protect against, and the fifth is an informative note in 8.1.
 
 Correcting the document and re-aligning the Python are deliberately TWO acts,
 in that order: classifying before editing is what preserves the evidence, and

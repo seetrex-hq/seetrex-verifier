@@ -754,7 +754,7 @@ fn completitud_rules(
                 let nc = c.len();
                 return ArmFinding::Failed(format!(
                     "monitor enumerates HEAD@{m} (the highest head it saw for this slug) \
-                     but no published artefact of this run reaches row {m} (chain export \
+                     but no artefact of this run reaches row {m} (chain export \
                      N={nc}, anchor package N={n}) — rows were truncated while their tail \
                      leaf stays in the log (G-v6-2). Before acting, re-fetch BOTH artifacts \
                      and re-run: this finding is only as fresh as the older of them, and an \
@@ -767,8 +767,8 @@ fn completitud_rules(
             // was supplied at all - telling an auditor to supply the export they DID
             // supply, and which was DECLINED, sends them in a circle.
             let remedy = if resolved.reference.supplied_export_rows.is_none() {
-                "Supply the producer's published chain export (--chain <chain.json>) \
-                 to decide it: a head no published artefact reaches is truncation, one \
+                "Supply the producer's chain export (--chain <chain.json>) \
+                 to decide it: a head neither artefact reaches is truncation, one \
                  either artefact carries is lag"
             } else {
                 "The chain export you supplied was DECLINED as evidence (the reason \
@@ -822,7 +822,7 @@ fn completitud_rules(
         forged_vs_export.map(|k| {
             ArmFinding::Failed(format!(
                 "enumerated HEAD@{k} (the lowest head whose chain_hash diverges) does not \
-                 match the producer's published chain export at row {k} — a forged or \
+                 match the producer's chain export at row {k} — a forged or \
                  rewritten leaf (G-v6-3)"
             ))
         }),
@@ -878,7 +878,7 @@ fn completitud_rules(
                          saw for this slug), beyond the anchor package's \
                          N={n} rows: the package alone cannot place that head, so the \
                          RETIRED can be neither cross-checked nor called forged. Supply \
-                         the producer's published chain export (--chain <chain.json>) \
+                         the producer's chain export (--chain <chain.json>) \
                          (G-v6-11 UNDECIDED)"
                     ));
                 }
@@ -1115,7 +1115,7 @@ fn admit_chain_export(rows: &[PublicChainRow], chain: &[PublicChainRow]) -> Resu
         let detail = mask_ledger_joiner(&format!("{e:?}"));
         return Err(format!(
             "the supplied chain export does not verify offline as a chain ({detail}): it is \
-             DECLINED as published evidence and nothing is concluded from it - re-fetch it \
+             DECLINED as evidence and nothing is concluded from it - re-fetch it \
              from the producer and re-run (G-v6-2 UNDECIDED)"
         ));
     }
@@ -1128,7 +1128,7 @@ fn admit_chain_export(rows: &[PublicChainRow], chain: &[PublicChainRow]) -> Resu
         return Err(format!(
             "the supplied chain export contradicts the anchor package at row {k}: the \
              package is a snapshot of that same chain, so a disagreement means the wrong \
-             export or a producer contradiction - it is DECLINED as published evidence and \
+             export or a producer contradiction - it is DECLINED as evidence and \
              nothing is concluded from it; re-fetch both artifacts from the producer and \
              re-run (G-v6-2 UNDECIDED)"
         ));
@@ -1783,8 +1783,8 @@ mod tests {
         // single-line string - ship inside the one sentence the auditor acts on.
         assert!(
             reason.contains(
-                "Supply the producer's published chain export (--chain <chain.json>) to \
-                 decide it: a head no published artefact reaches is truncation, one either \
+                "Supply the producer's chain export (--chain <chain.json>) to \
+                 decide it: a head neither artefact reaches is truncation, one either \
                  artefact carries is lag"
             ),
             "the remedy sentence must reach the auditor intact: {reason}"
@@ -2197,7 +2197,7 @@ mod tests {
         },
         DeclaredArm {
             name: "(b) forged against the EXPORT's rows",
-            signature: "does not match the producer's published chain export at row",
+            signature: "does not match the producer's chain export at row",
         },
         DeclaredArm {
             name: "(c) the LENGTH rule - no artefact reaches M",
@@ -3092,7 +3092,7 @@ mod tests {
             "no run of double spaces may reach the auditor: {reason}"
         );
         assert!(
-            !reason.contains("Supply the producer's published chain export"),
+            !reason.contains("Supply the producer's chain export"),
             "must not ask for an export the auditor already supplied: {reason}"
         );
     }
@@ -3486,9 +3486,22 @@ mod tests {
             &fresh(),
             Some(true),
         );
+        let Verdict::Inconclusive { reason } = &v else {
+            panic!("a RETIRED past the package's rows is unplaceable, not forged: {v:?}")
+        };
+        // The remedy names the export by what it is, never as a public or
+        // published thing: since 2026-11-04 the vendor serves no
+        // chain, and the auditor receives it from the vendor.
+        let flat = reason.split_whitespace().collect::<Vec<_>>().join(" ");
         assert!(
-            matches!(v, Verdict::Inconclusive { .. }),
-            "a RETIRED past the package's rows is unplaceable, not forged: {v:?}"
+            flat.contains(
+                "Supply the producer's chain export (--chain <chain.json>) (G-v6-11 UNDECIDED)"
+            ),
+            "the RETIRED remedy must name the input that decides it: {reason}"
+        );
+        assert!(
+            !flat.to_lowercase().contains("publish") && !flat.to_lowercase().contains("public"),
+            "the RETIRED remedy calls the export public or published: {reason}"
         );
     }
 

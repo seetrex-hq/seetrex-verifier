@@ -51,7 +51,7 @@ pub const SCOPE_STATEMENT: &str = "\
 This check re-computes hashes only. It does NOT re-execute the inference \
 engine (that is `replay --full`), and it does NOT prove this verdict's \
 position in the chain or its freshness (that is `verify-chain` against the \
-published chain export with an externally obtained anchor). Package-internal \
+vendor's chain export with an externally obtained anchor). Package-internal \
 consistency alone is never a trust root.";
 
 /// The ONE spelling of the reserved strong-pass token, for every surface

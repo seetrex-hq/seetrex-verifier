@@ -19,10 +19,10 @@ auditor can recompute from it **without the vendor binary**:
 - the audit chain link (§8).
 
 **Scope of independent verification (the two legs).** What this format makes
-verifiable from public material alone — with no vendor involvement at all — is
+verifiable with this open document and an open verifier alone — no vendor binary, and no vendor in the computation — is
 the **integrity of the record**: the per-file hashes, the evidence-to-reference
-binding, the ruleset content hash, the verdict hash, the audit chain link and
-its external anchor. **Re-derivation of the verdict outcome** (re-executing the
+binding, the ruleset content hash, the verdict hash and the audit chain link, recomputed over the bytes the reader holds.
+The **external anchor** those recomputations are compared against (§9.3) is an input to this leg, not one of its outputs: it is only as independent of the vendor as its source is, and an anchor that reaches the reader from the same vendor as the package proves nothing against a re-forge by that vendor (§9.3). **Re-derivation of the verdict outcome** (re-executing the
 inference over the evidence) is deliberately outside this leg: it requires the
 inference engine, which is closed source; it is provided as a signed,
 reproducibly built binary (black box), or as a source rebuild under NDA for
@@ -956,8 +956,8 @@ but SHA-256 and string concatenation.
 
 ### 8.1 The public chain export
 
-The chain is published per tenant as a JSON document with a closed key set
-(verifiers MUST reject unknown keys):
+The chain is exported per tenant as a JSON document with a closed key set
+(verifiers MUST reject unknown keys; "public" in this section's title names what the export holds, hashes and non-payload metadata, not where it is served):
 
 ```json
 { "schema_version": "1.0", "chain": [ <row>, <row>, … ] }
@@ -981,7 +981,7 @@ Verifying an export means checking, for every row, that `chain_prev_hash`
 equals the previous row's `chain_hash` (null exactly and only at ordinal 1),
 that the recomputed link equals the row's persisted `chain_hash`, and that
 ordinals are contiguous from 1. The resulting head (`verdict_count`,
-`last_chain_hash`) can then be compared against the published tenant page.
+`last_chain_hash`) can then be compared against a head the reader obtained elsewhere (§9.3).
 
 `schema_version` is a fail-closed discriminator like `preimage_version` (§7.4)
 and `package_format_version` (§9.6 step 1): a verifier MUST reject any value
@@ -995,7 +995,7 @@ nothing an external anchor could attest and no claim a verifier could pass.
 to establish the order it then checks. *(Clarified 2026-08-30, T10 — Q14.)*
 A `verify-chain` implementation exits `0` when every link recomputes and `1`
 on any failure; the exit code `4` of §9.6 has no counterpart here, because a
-chain export's head is compared against the published page by the reader, not
+chain export's head is compared against a head obtained elsewhere by the reader, not
 by an option of this command. *(Clarified 2026-08-30, T10 — Q1.)*
 On success the implementation MUST print a line containing the token
 `VERIFIED OFFLINE` — this is the surface §9.6 reserves the word `VERIFIED`
@@ -1011,10 +1011,10 @@ at **50 MiB** — its own cap, larger than the 10 MiB per-file cap of §9.6,
 which would otherwise refuse an honest export at a few tens of thousands of
 rows. *(Clarified 2026-08-30, T10 — Q16.)*
 
-The export is obtained from the vendor's public Trust Center — for example
-(non-normative) the tenant's page under `https://trust.seetrex.com/` — over a
-channel the auditor chooses and controls; §9.3 governs its role as the
-external anchor source.
+Where the export comes from is outside this format. Non-normative: at this revision the reference vendor publishes no export (its public Trust Center is retired: refused at its edge, and until the vendor's host completes the retirement its origin still answers a request addressed to it directly with the files its hourly pipeline still writes, which is no channel the vendor offers), so an auditor obtains it from the vendor, as the chain export handed over for the audit;
+verifying it shows the chain is internally consistent, and nothing about who wrote it, so the export so obtained is NOT, by itself, an external anchor independent of the
+vendor who also supplies the package — §9.3 governs which sources are, and states that limit.
+*(Reworded 2026-11-05: the Trust Center is retired; the limit is stated in §9.3.)*
 
 The package's `manifest.json` copies `chain_prev_hash` and `chain_hash` for
 correlation, but — see §9.4 — matching them proves nothing about the
@@ -1027,7 +1027,7 @@ anything: the two fields hold fixed batch metadata the row format requires,
 `seetrex-oss-batch-v1` and `SATISFIED` on every row. `verdict_hash` there is the
 RFC 6962 root of a batch, so the class the table gives it does not hold for
 these rows: it has no §7 preimage, `verify-package` does not apply, and a root
-is checked from one of its members with `verify-record`, which arrives with verifier 0.3.8. That export is not published yet.
+is checked from one of its members with `verify-record`, published in verifier 0.3.8. That export is not published: it stays local to its producer.
 `verify-chain` passes over the export as over any other. `schema_version` stays
 `"1.0"`, and this note changes nothing a verifier MUST do.
 
@@ -1124,27 +1124,28 @@ the package. An internally coherent re-forge passes every self-contained
 check by construction.
 
 Therefore: a verifier MUST compare the recomputed verdict hash against an
-expected value obtained **outside the package** — the tenant's public chain
-export from the Trust Center, a previously recorded hash, or another channel
+expected value obtained **outside the package** — the tenant's chain export (§8.1), a previously recorded hash, or another channel
 the auditor controls — and MUST NOT report success on the strength of
 package-internal consistency alone. A verifier implementation MUST NOT
 describe a check that lacked either re-derivation (§9.2) or an external
 anchor as "verified"; overclaiming the mode that ran is a conformance
 violation of this specification.
 
+**Security limit (informative): an anchor from the vendor is outside the package, not outside the vendor.** The duty above is met by any value obtained outside the package, and a verifier cannot tell where the value came from. When the same vendor hands over both the package and the chain export, a vendor that re-forges a verdict can re-forge the export to match: both legs pass, and this format detects nothing. The comparison protects against such a re-forge only when the expected value was fixed before it and outside the vendor's reach — a hash the auditor (or another party) recorded earlier, or a chain head logged by an independent transparency log. Non-normative: the reference vendor logs the heads of its own chain as leaves of the Sigsum transparency log `seasalp.glasklar.is`, which answers an inclusion proof for each of them to anyone (the auditor kit, section 7), so for those heads the second kind is available; the batch chain of the informative note in §8.1 is not logged at this revision. What each kind protects, and what it does not: a hash recorded earlier protects the integrity of the prefix of the chain up to the ordinal it was recorded at, since no row at or before that ordinal can be rewritten without the comparison failing; it covers nothing appended after it was recorded, and it says nothing about freshness. Against retention — an export that stops early, a tail withheld — it protects nothing either, because a truncated export still matches every hash recorded before its end; only an independent log that someone monitors protects against that, by showing heads later than the export's last row. A vendor's signature on what it delivers binds the delivery to the vendor; it is not an independent anchor either.
+
 ### 9.4 Chain position and freshness are out of scope for package verification
 
 A *genuine but superseded* verdict — packaged with its own authentic hash and
 its own historically valid chain links — passes both §9.1 and §9.2, including
-the external-anchor comparison (its hash really is in the public chain).
+the external-anchor comparison (its hash really is in the chain export).
 Neither mode proves that the verdict is the **current** one for its control,
 nor *where* it sits in the chain, nor that no later verdict superseded it.
 
-Position and freshness are established only by verifying the full public
-chain export (§8) against the Trust Center and locating the verdict's hash at
+Position and freshness are established only by verifying the full chain
+export (§8), obtained as §8.1 says and subject to the limit of §9.3, and locating the verdict's hash at
 its ordinal there. Auditors needing "this is the latest verdict for control
 X" MUST combine package verification with a chain-export check; package
-verification alone can never answer that question.
+verification alone can never answer that question. A hash recorded earlier does not answer it either: it fixes the prefix up to its own ordinal, not the end of the chain (§9.3).
 
 ### 9.5 What nothing in this specification proves
 
@@ -1279,7 +1280,7 @@ an anchored one; the reference tooling additionally prints a hint to re-run with
 strong surfaces (`replay --full` / `verify-chain`). A package-integrity
 implementation MUST NOT emit `VERIFIED` from this mode. Informative: the
 surfaces that DO emit `VERIFIED` are the full-replay CLI (`replay --full`, §9.2)
-and the offline chain verification (`verify-chain` against the published chain
+and the offline chain verification (`verify-chain` against a chain
 export, §8.1); the emission of the `VERIFIED` token by those surfaces is not
 specified by this document, but naming them gives the reserve its stated
 counterpart. Because several failure
@@ -1301,8 +1302,8 @@ actually reached the output. *(Clarified 2026-08-30, T10 — Q15.)*
 on failure alike, the reference tooling prints a scope statement to the effect
 that this check re-computes hashes only; that it does NOT re-execute the
 inference engine (that is `replay --full`); that it does NOT prove the verdict's
-chain position or freshness (that is `verify-chain` against the published chain
-export with an externally obtained anchor); and that **package-internal
+chain position or freshness (that is `verify-chain` against a chain
+export with an externally obtained anchor, §9.3; the reference tooling's own words still say «published chain export»); and that **package-internal
 consistency alone is never a trust root**. An implementation SHOULD surface an
 equivalent statement so a reader can never mistake a package-integrity pass for
 a full re-derivation or a freshness proof.

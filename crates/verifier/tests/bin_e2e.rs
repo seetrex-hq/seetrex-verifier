@@ -408,6 +408,217 @@ fn test_scenario_verify_chain_ok_and_broken() {
     assert!(!se.to_ascii_uppercase().contains("VERIFIED"), "no strong token: {se}");
 }
 
+/// INTENT: `verify-chain` tells the auditor to compare the head it prints
+///         with a value the vendor states over a channel other than the one
+///         that delivered the file, and sends no one to a public page: no
+///         Trust Center, nothing "the vendor publishes". Every limit of the
+///         comparison stays on screen (no proof against removal, the
+///         earlier copy that catches it, the unbound columns).
+/// CONTEXT: on 2026-11-04 the vendor retired the public Trust Center for
+///          every tenant; the trailer still sent the auditor to "the vendor's
+///          public Trust Center page for this tenant", a page that no longer
+///          exists. The export now reaches the auditor privately.
+/// EXPIRES IF: a public channel for chain exports is reopened, and the
+///             trailer names it on purpose.
+#[test]
+fn test_intent_verify_chain_names_no_retired_public_page() {
+    let tmp = tempdir();
+    let path = tmp.path().join("chain.json");
+    std::fs::write(&path, serde_json::to_string_pretty(&valid_chain_export(2)).unwrap()).unwrap();
+    let out = run(&["verify-chain", path.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0), "valid export must exit 0: {}", stderr(&out));
+    let so = stdout(&out);
+    for needle in [
+        "Compare these two values against the head the vendor states to you over a \
+         channel other than the one that delivered this file.",
+        "A match proves this file agrees with what the vendor states RIGHT NOW — nothing more.",
+        "It does NOT prove rows were not removed",
+        "What catches removal is material you kept earlier",
+        "This tool has no command for either comparison",
+        "NOT covered by this check",
+        "committed NOWHERE",
+    ] {
+        assert!(so.contains(needle), "verify-chain no longer states «{needle}»: {so}");
+    }
+    assert_names_no_retired_public_source("verify-chain stdout", &so);
+    let help = stdout(&run(&["--help"]));
+    assert_names_no_retired_public_source("--help", &help);
+}
+
+/// Collapse every run of whitespace to one space. `--help` wraps its prose at a
+/// fixed width, so a phrase broken across two lines (`public chain\n<indent>export`)
+/// is invisible to a plain `contains`; measured on the review of this guard, three
+/// such reintroductions stayed green.
+fn one_line(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// The only spellings of «public»/«published» a verifier surface may still print,
+/// each removed (case-sensitively, after `one_line`) before the search:
+///
+/// * `Public chain package VERIFIED OFFLINE` is the strong-pass banner of
+///   `verify-chain`, a FROZEN marker: section 8.1 of the hash-pinned
+///   `SPEC_VERDICT_PACKAGE_V1.md` quotes it, the reference implementation
+///   (`reference/seetrex_verifier.py`) prints it byte for byte, `kit_doc` and the
+///   golden pin it. «Public» there names the export
+///   FORMAT (the hash-only row allowlist), not a place to fetch it from.
+/// * `public key` is the cryptographic term (`the kit pins no public key`).
+const RETIRED_SOURCE_ALLOWED: [&str; 2] = ["Public chain package VERIFIED OFFLINE", "public key"];
+
+/// What no surface may say once the allowed spellings are removed (lower-cased
+/// text): the retired page, its hosts, and the export as a public or published
+/// thing.
+const RETIRED_SOURCE_WORDS: [&str; 6] =
+    ["trust center", "trust.seetrex", "seetrex.com/trust", "public", "published", "vendor publishes"];
+
+fn assert_names_no_retired_public_source(what: &str, text: &str) {
+    let mut flat = one_line(text);
+    for allowed in RETIRED_SOURCE_ALLOWED {
+        flat = flat.replace(allowed, "");
+    }
+    let flat = flat.to_lowercase();
+    for stale in RETIRED_SOURCE_WORDS {
+        assert!(
+            !flat.contains(stale),
+            "{what} still says «{stale}», a public source retired on 2026-11-04: {text}"
+        );
+    }
+}
+
+/// INTENT: the other two auditor-facing commands that name the chain export say
+///         where it truthfully comes from (the vendor, or another channel
+///         independent of the package) and never call it public or published:
+///         `verify-package` without an anchor (its scope line and its hint), and
+///         `verify-anchor` on every `--chain` remedy it prints — package-only lag,
+///         a RETIRED beyond the package, a DECLINED export (both reasons: one
+///         that does not verify, one that contradicts the package) and its
+///         banner line, and the length-rule finding with the export supplied
+///         («no artefact of this run reaches», round 2 of 0.3.9, R2-a I-1).
+/// CONTEXT: on 2026-11-04 the vendor retired the public Trust Center; the
+///          first rewrite of these texts was unguarded, and a blind review put
+///          «published chain export» back into each of them with every suite
+///          green.
+/// EXPIRES IF: a public channel for chain exports is reopened, and these texts
+///             name it on purpose.
+#[test]
+fn test_intent_package_and_anchor_name_no_retired_public_source() {
+    // verify-package, unanchored: scope statement + hint.
+    let tmp = tempdir();
+    minimal_v1_package(tmp.path());
+    let out = run(&["verify-package", tmp.path().to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(4), "unanchored pass must exit 4: {}", stderr(&out));
+    let so = one_line(&stdout(&out));
+    for needle in [
+        "that is `verify-chain` against the vendor's chain export with an externally \
+         obtained anchor",
+        "obtained from the vendor's chain export or another channel independent of this \
+         package",
+        "the package can never be its own trust root",
+    ] {
+        assert!(so.contains(needle), "verify-package no longer states «{needle}»: {so}");
+    }
+    assert_names_no_retired_public_source("verify-package (unanchored)", &so);
+
+    // verify-anchor: one run per `--chain` remedy.
+    let anchor_run = |monitor: serde_json::Value, chain: Option<serde_json::Value>| {
+        let tmp = tempdir();
+        let anchor = tmp.path().join("anchor.json");
+        let kit = tmp.path().join("kit.json");
+        let monitor_path = tmp.path().join("monitor.json");
+        let mut a = valid_anchor_json_value("example-tenant");
+        a["checkpoint"] = fb2c_oracle_value()["c_audit"].clone();
+        let mut k = valid_kit_json_value("example-tenant");
+        k["genesis_key_hash"] = serde_json::json!(SUBMITTER_KH);
+        write(&anchor, &a);
+        write(&kit, &k);
+        write(&monitor_path, &monitor);
+        let mut args: Vec<String> = vec![
+            "verify-anchor".into(),
+            as_str(&anchor),
+            "--kit".into(),
+            as_str(&kit),
+            "--monitor".into(),
+            as_str(&monitor_path),
+        ];
+        if let Some(c) = chain {
+            let chain_path = tmp.path().join("chain.json");
+            write(&chain_path, &c);
+            args.push("--chain".into());
+            args.push(as_str(&chain_path));
+        }
+        let out = run_owned(&args);
+        one_line(&format!("{}{}", stdout(&out), stderr(&out)))
+    };
+    // The RETIRED-beyond-the-package remedy needs a cosigned RETIRED leaf at the
+    // enumerated tail past the package, which no committed oracle carries; it is
+    // pinned at the rule instead
+    // (`g_v6_11_retired_beyond_the_package_is_undecided_not_forged`).
+    // The FIRST reason `admit_chain_export` declines an export for (it does not
+    // verify as a chain) is unreachable from the executable: the CLI refuses
+    // such a file before COMPLETITUD runs («chain export does not verify
+    // offline», measured). So that literal is read from the source, from its
+    // opening words up to the `"` that closes it, and held to the same sweep
+    // as the printed texts.
+    let source = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("src/anchor_completitud.rs"),
+    )
+    .expect("src/anchor_completitud.rs is readable")
+    .replace("\r\n", "\n")
+    .replace("\\\n", " ");
+    let source = one_line(&source);
+    let opening = "the supplied chain export does not verify offline as a chain";
+    let at = source
+        .find(opening)
+        .expect("admit_chain_export no longer opens its first DECLINED reason as it did");
+    let end = source[at..]
+        .find('"')
+        .map(|i| at + i)
+        .expect("the first DECLINED reason's literal has no closing `\"`");
+    let first_declined = &source[at..end];
+    assert!(
+        first_declined.contains(
+            "DECLINED as evidence and nothing is concluded from it - re-fetch it from the \
+             producer and re-run"
+        ),
+        "the first DECLINED reason of admit_chain_export no longer reads «DECLINED as evidence \
+         and nothing is concluded from it - re-fetch it from the producer and re-run»: \
+         {first_declined}"
+    );
+    assert_names_no_retired_public_source("admit_chain_export, first DECLINED reason", first_declined);
+    let cases: [(&str, String, &[&str]); 3] = [
+        (
+            "verify-anchor, truncation decided with the export",
+            anchor_run(oracle_without_forged_retired(), Some(chain_export_json_value(3))),
+            &["but no artefact of this run reaches row", "(chain export N=3, anchor package N=3)"],
+        ),
+        (
+            "verify-anchor, package only (lag)",
+            anchor_run(oracle_without_forged_retired(), None),
+            &["Supply the producer's chain export (--chain <chain.json>) to decide it: a head \
+               neither artefact reaches is truncation, one either artefact carries is lag"],
+        ),
+        (
+            "verify-anchor, DECLINED export",
+            anchor_run(
+                oracle_without_forged_retired(),
+                Some(chain_export_json_value_diverging_at(4, 2)),
+            ),
+            &[
+                "truncation reference: chain export DECLINED (4 rows, not used); package rows \
+                 only, 3 rows; reference N=3",
+                "it is DECLINED as evidence and nothing is concluded from it",
+                "The chain export you supplied was DECLINED as evidence",
+            ],
+        ),
+    ];
+    for (what, combined, needles) in cases {
+        for needle in needles {
+            assert!(combined.contains(needle), "{what} no longer states «{needle}»: {combined}");
+        }
+        assert_names_no_retired_public_source(what, &combined);
+    }
+}
+
 /// INTENT: the argv FILENAME of verify-chain is sanitized too — a
 ///         scripted pipeline can be fed a hostile path like
 ///         `VERIFIED_chain.json`, and the cannot-read error echoes it;
@@ -1115,7 +1326,7 @@ fn test_intent_verify_anchor_real_truncation_with_chain_fails_exit_1() {
     );
     assert!(
         combined.contains(
-            "truncation reference:    published chain export, 3 rows (package 3; reference N=3)"
+            "truncation reference:    chain export, 3 rows (package 3; reference N=3)"
         ),
         "the run must surface the reference it decided against, in full: {combined}"
     );
@@ -1168,7 +1379,7 @@ fn test_intent_relengthened_chain_export_cannot_absolve_a_head() {
     assert!(
         completitud_class(&combined) == "FAILED"
             && verdict.contains("G-v6-3")
-            && verdict.contains("published chain export at row 42"),
+            && verdict.contains("producer's chain export at row 42"),
         "the export's own row must be what refuses it: {verdict}"
     );
     // The WHOLE rendering, including `reference N`. Asserting only the prefix left
@@ -1177,7 +1388,7 @@ fn test_intent_relengthened_chain_export_cannot_absolve_a_head() {
     // decided against 42 and the entire suite stayed green.
     assert!(
         combined.contains(
-            "truncation reference:    published chain export, 42 rows (package 3; reference N=42)"
+            "truncation reference:    chain export, 42 rows (package 3; reference N=42)"
         ),
         "the run must surface the reference it decided against, in full: {combined}"
     );
@@ -1251,7 +1462,7 @@ fn test_intent_verify_anchor_reference_rises_never_falls() {
     let combined = format!("{}{}", stdout(&longer), stderr(&longer));
     assert!(
         combined.contains(
-            "truncation reference:    published chain export, 9 rows (package 3; reference N=9)"
+            "truncation reference:    chain export, 9 rows (package 3; reference N=9)"
         ),
         "an admitted longer export must RAISE the reference: {combined}"
     );
@@ -1404,7 +1615,7 @@ fn verify_anchor_completitud_failed_before_the_truncation_rule_says_so() {
 /// the library and is never recomputed.
 /// CONTEXT: measured on the clean tree - a live 41-row export diverging from the
 /// package at row 3 was DECLINED, the rule judged against N=12, and the banner said
-/// `truncation reference: published chain export, 41 rows (package 12; reference
+/// `truncation reference: chain export, 41 rows (package 12; reference
 /// N=41)`, because the bin re-derived `max(supplied, package)` itself.
 /// EXPIRES IF: a declined export starts contributing to the reference (it must not).
 #[test]
