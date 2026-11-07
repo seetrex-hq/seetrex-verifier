@@ -27,19 +27,17 @@
 # and carries no `--help` row — one there is refused by name, because every
 # non-`version` key in that file is taken for a subcommand.
 # Measured in this tree by bin_e2e, which spawns the built executable once per
-# row. All seven rows were also observed 2026-11-03 against the PUBLISHED
-# seetrex-verifier 0.3.8, installed from crates.io into an empty root
-# (`cargo install seetrex-verifier --locked --version 0.3.8`): every value
+# row. All seven rows were also observed 2026-11-07 against the PUBLISHED
+# seetrex-verifier 0.3.9, installed from crates.io into an empty root
+# (`cargo install seetrex-verifier --locked --version 0.3.9`): every value
 # below is identical in the published tool and in this tree, the `--help` row
 # included. That closes the re-observation the previous revision of this note
-# declared owed for the `verify-record` row, the one row no earlier observation
-# could see. The six older rows were observed 2026-09-01 against the published
-# 0.3.7, 2026-08-31 against the published 0.3.6 and 2026-08-29 against the
-# published 0.3.5 with the same values: none of them is added, dropped or
-# re-coded across the four, and no `--help` exit code has moved since this
-# record was written. The tree is now released as 0.3.9, which rewords printed
-# lines and moves no exit code; re-observation against the published 0.3.9 is
-# owed (release runbook, section 7).
+# declared owed for 0.3.9. The seven rows were observed 2026-11-03 against the
+# published 0.3.8 with the same values. The six older rows were observed
+# 2026-09-01 against the published 0.3.7, 2026-08-31 against the published
+# 0.3.6 and 2026-08-29 against the published 0.3.5 with the same values: none
+# of them is added, dropped or re-coded across the five, and no `--help` exit
+# code has moved since this record was written.
 --help	0
 verify-anchor	2
 verify-chain	1

@@ -103,6 +103,18 @@ release job builds the page as part of the cut itself.
   the installed `0.3.8`. That revision of the kit,
   `2026-11-03-recapture-0-3-8`, is the record; this file restates none of its
   figures.
+- 2026-11-07: the re-observation the `0.3.9` entry below called owed has been
+  made against the published channel. After the crate reached crates.io and
+  its signed tag `seetrex-verifier-v0.3.9` reached the public repository, the
+  install capture, the subcommand help codes, the `git tag -v` walkthrough, the
+  suite run in the two published trees, the tag list, the registry read-back,
+  route F against the release, the line endings and appendix A of
+  `docs/AUDITOR_KIT.md` were measured again against the channel, its section
+  7.1 walkthrough was run again with the installed `0.3.9` over the inputs of
+  its 2026-11-03 capture, and the transcripts of
+  `examples/verdict-package/README.md` were captured again with it. That
+  revision of the kit, `2026-11-07-recapture-0-3-9`, is the record; this file
+  restates none of its figures.
 
 ## [seetrex-verifier 0.3.9] — 2026-11-07
 
@@ -116,8 +128,9 @@ moves between `0.3.8` and this tree, and the help exit codes measured by
 library modules that print the lines (`anchor_completitud.rs`,
 `cli_render.rs`, `package.rs`, `scope.rs`), so their text differs from the
 `0.3.8` tarball while their checks do not. This entry was written from the
-tree the release is cut from; the re-observation against the published
-`0.3.9` is owed (release runbook, section 7).
+tree the release is cut from: the re-observation against the published
+`0.3.9` that it owed (release runbook, section 7) was made on 2026-11-07,
+recorded under `[Unreleased]` above.
 
 ### Changed
 - The public Trust Center was retired for every tenant on 2026-11-04: the
@@ -158,11 +171,17 @@ tree the release is cut from; the re-observation against the published
   rewritten"), where the word names what the log and the anchored head
   committed, not a place to fetch a file from; and the scope block's "no artifact we publish
   binds them", which is about the vendor's own artefacts and is shared byte
-  for byte with the vendor's CLI. The transcripts in `docs/AUDITOR_KIT.md`
-  and `examples/verdict-package/README.md` were captured with the published
-  `0.3.8` and show its wording; their re-capture with the published `0.3.9`
-  is owed (release runbook, section 7). No check, verdict or exit code
-  changed.
+  for byte with the vendor's CLI. The transcripts of
+  `examples/verdict-package/README.md`, and those of `docs/AUDITOR_KIT.md`
+  made with the published `0.3.8` (the install capture of section 2.1, the
+  `git tag -v` walkthrough of section 2.2, the 7.1 walkthrough, the
+  subcommand help codes and appendix A), showed its wording; they were
+  captured again with the published `0.3.9` on 2026-11-07 (release runbook,
+  section 7). The kit's older captures were not: the section 3 output
+  (2026-07-27, `0.3.3`), the section 4 failure capture (2026-07-20) and the
+  frozen outputs of section 7.4 keep the wording of the release that printed
+  them, and section 3 of the kit states what `0.3.9` prints in their
+  place. No check, verdict or exit code changed.
 
 ## [seetrex-verifier 0.3.8] — 2026-11-03
 

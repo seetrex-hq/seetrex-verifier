@@ -39,7 +39,7 @@ Install the verifier first (see the repository README or
 [`docs/AUDITOR_KIT.md`](../../docs/AUDITOR_KIT.md)):
 
 ```
-$ cargo install seetrex-verifier --locked --version 0.3.8
+$ cargo install seetrex-verifier --locked --version 0.3.9
 ```
 
 **Without an external anchor** — internal consistency only:
@@ -49,20 +49,22 @@ $ seetrex-verifier verify-package examples/verdict-package/package
 ...
 STEP 7 external anchor SKIPPED — no --expected-verdict-hash supplied; the result is self-consistent only
 SELF-CONSISTENT (unanchored)
-This check re-computes hashes only. It does NOT re-execute the inference engine (that is `replay --full`), and it does NOT prove this verdict's position in the chain or its freshness (that is `verify-chain` against the published chain export with an externally obtained anchor). Package-internal consistency alone is never a trust root.
-HINT: pass --expected-verdict-hash <hex> (obtained from the published chain export or another external channel) to upgrade this to INTEGRITY-OK (weak) — the package can never be its own trust root.
+This check re-computes hashes only. It does NOT re-execute the inference engine (that is `replay --full`), and it does NOT prove this verdict's position in the chain or its freshness (that is `verify-chain` against the vendor's chain export with an externally obtained anchor). Package-internal consistency alone is never a trust root.
+HINT: pass --expected-verdict-hash <hex> (obtained from the vendor's chain export or another channel independent of this package) to upgrade this to INTEGRITY-OK (weak) — the package can never be its own trust root.
 ```
 
 Exit code `4`. This is deliberately *not* a verification: a coherent forgery is
 self-consistent by construction. The package can never be its own trust root.
 
 **With the anchor taken from the chain export** — the way an auditor works.
-The transcript below was re-captured on 2026-11-03 with the `0.3.8`
+The transcript below was re-captured on 2026-11-07 with the `0.3.9`
 executable installed by the command above, run against the files in this
-directory. Every fence is byte-identical to the `0.3.7` capture it replaces.
-`0.3.8` adds a subcommand and a kit format, and moves neither of the two
-commands shown here, their output or their exit codes; this re-capture is the
-measurement that says so rather than the assumption:
+directory, and so was the unanchored run above. `0.3.9` rewords lines both
+commands print: the scope line of a package check, the hint of an unanchored
+pass and the sentence the chain check prints after its head now name the
+vendor's chain export, or the head the vendor states to you, where `0.3.8`
+named the published one or the Trust Center page. Every other line, every hash
+and every exit code is what the `0.3.8` capture of 2026-11-03 printed:
 
 ```
 $ seetrex-verifier verify-chain examples/verdict-package/example-audit-tenant-chain.json
@@ -70,7 +72,7 @@ Public chain package VERIFIED OFFLINE
   verdict_count:   1
   last_chain_hash: ee6879123d5b8b67267e740ca93bfba1d543892177604b9742791b84bebf5a3e
 
-Compare these two values against the vendor's public Trust Center page for this tenant. A match proves this file agrees with what the vendor publishes RIGHT NOW — nothing more. It does NOT prove rows were not removed: a vendor who republishes a truncated chain also republishes its shorter head, so both sides of this comparison move together. What catches removal is material you kept earlier — a copy of this export, or a verdict package whose verdict_hash (recompute it with `verify-package`) still appears in a row of the published chain. Each export you fetch should extend the prefix you already hold, not rewrite it; keeping and comparing that material is your step. This tool has no command for either comparison; you must keep the material and make it yourself.
+Compare these two values against the head the vendor states to you over a channel other than the one that delivered this file. A match proves this file agrees with what the vendor states RIGHT NOW — nothing more. It does NOT prove rows were not removed: a vendor who truncates the chain also states its shorter head, so both sides of this comparison move together. What catches removal is material you kept earlier — a copy of this export, or a verdict package whose verdict_hash (recompute it with `verify-package`) still appears in a row of this chain. Each export you receive should extend the prefix you already hold, not rewrite it; keeping and comparing that material is your step. This tool has no command for either comparison; you must keep the material and make it yourself.
 
 NOT covered by this check: the human-readable columns of each row (verdict_outcome, ruleset_id, appended_at, verdict_id). They are not inputs to the chain link, so altering them keeps every link — and the hash above — valid. Two of them — verdict_outcome and ruleset_id — are committed inside that row's verdict_hash, recomputable only from that verdict's package (`verify-package`). The other two — appended_at and verdict_id — are committed NOWHERE: they are inputs neither to the chain link nor to verdict_hash, and no artifact we publish binds them. Treat all four as unverified metadata; the last two you cannot verify at all.
 
@@ -79,7 +81,7 @@ $ seetrex-verifier verify-package examples/verdict-package/package \
 ...
 STEP 7 external anchor OK — the recomputed hash matches the externally supplied expected hash
 INTEGRITY-OK (weak)
-This check re-computes hashes only. It does NOT re-execute the inference engine (that is `replay --full`), and it does NOT prove this verdict's position in the chain or its freshness (that is `verify-chain` against the published chain export with an externally obtained anchor). Package-internal consistency alone is never a trust root.
+This check re-computes hashes only. It does NOT re-execute the inference engine (that is `replay --full`), and it does NOT prove this verdict's position in the chain or its freshness (that is `verify-chain` against the vendor's chain export with an externally obtained anchor). Package-internal consistency alone is never a trust root.
 ```
 
 Exit code `0`. The anchor hash is read from the chain export — a file obtained
